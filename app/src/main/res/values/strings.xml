@@ -1,0 +1,165 @@
+<resources>
+    <string name="app_name">Octo</string>
+
+    <!-- Share ingestion (ShareIngestActivity) -->
+    <string name="share_activity_label">Add to Octo</string>
+    <string name="share_added">Added to Octo 🐙</string>
+    <string name="share_invalid_url">No YouTube video link found</string>
+
+    <!-- Library screen -->
+    <string name="library_title">Library</string>
+    <string name="library_empty_title">Your library is empty</string>
+    <string name="library_empty_body">Share a YouTube video from the YouTube app\u2019s share menu and pick Octo — it will appear here. You can also tap + to paste a link.</string>
+    <string name="library_add_url">Add video URL</string>
+    <string name="library_add">Add</string>
+    <string name="library_cancel">Cancel</string>
+    <string name="library_url_hint">https://youtube.com/watch?v=…</string>
+    <string name="library_delete_title">Delete video?</string>
+    <string name="library_delete_body">Removes the downloaded files and the library entry. You can always re-share the video later.</string>
+    <string name="library_delete_confirm">Delete</string>
+    <string name="library_play">Play</string>
+    <string name="library_retry">Retry</string>
+    <string name="library_delete">Delete</string>
+    <string name="library_state_pending">Queued</string>
+    <string name="library_state_downloading">Downloading…</string>
+    <string name="library_state_completed">Downloaded</string>
+    <string name="library_state_failed">Failed</string>
+    <string name="library_state_stream_only">Stream-only</string>
+    <string name="library_add_failed">Couldn\u2019t parse a YouTube URL</string>
+    <string name="library_add_duplicate">Already in your library</string>
+    <string name="library_menu">More options</string>
+    <string name="library_analyze">Analyze</string>
+    <string name="library_analyzing">Analyzing…</string>
+    <string name="library_no_transcript">No transcript available</string>
+    <!-- Phase 21: search + body-part filter + compact cards -->
+    <string name="library_search_hint">Search title or channel</string>
+    <string name="library_filter_clear">Clear</string>
+    <string name="library_no_match">No videos match</string>
+
+    <!-- Player screen (Phase 4) -->
+    <string name="player_back">Back</string>
+    <string name="player_loading">Loading…</string>
+    <string name="player_state_playing">Playing — timer running</string>
+    <string name="player_state_paused">Paused — timer held</string>
+    <string name="player_timer_hint">counts only while playing</string>
+    <string name="player_finish">Finish Session</string>
+    <string name="player_finished_title">Session saved 🐙</string>
+    <string name="player_tail_sent">✓ Sent %1$d min to Tail (“%2$s”)</string>
+    <string name="player_tail_not_installed">Tail not installed — session saved locally</string>
+    <string name="player_tail_error">Couldn\u2019t reach Tail — session saved locally</string>
+    <string name="player_missing_files">No local video to play. Download it from the Library first.</string>
+    <string name="player_retry_download">Back to Library</string>
+    <string name="player_back_to_library">Back to Library</string>
+    <string name="player_exit_title">Leave session?</string>
+    <string name="player_exit_body">Played time will be saved and counted, but the session won\u2019t be marked complete.</string>
+    <string name="player_exit_save_and_leave">Save and leave</string>
+    <string name="player_cancel">Keep playing</string>
+    <string name="player_resize_zoom">Fill screen (crop)</string>
+    <string name="player_resize_fit">Fit (black bars)</string>
+    <string name="player_show_controls">Show controls</string>
+
+    <!-- Settings screen (Phase 5) -->
+    <string name="settings_title">Settings</string>
+    <string name="settings_llm_section">LLM extraction</string>
+    <string name="settings_llm_base_url">Base URL</string>
+    <string name="settings_llm_api_key">API key</string>
+    <string name="settings_llm_model">Model</string>
+    <string name="settings_llm_key_hidden">\u2022\u2022\u2022\u2022\u2022\u2022\u2022\u2022</string>
+    <string name="settings_show">Show</string>
+    <string name="settings_hide">Hide</string>
+    <string name="settings_save">Save</string>
+    <string name="settings_saved">Saved \u2713</string>
+    <string name="settings_test_llm">Test LLM</string>
+    <string name="settings_test_running">Testing…</string>
+    <string name="settings_test_ok">LLM reachable \u2713 %1$s</string>
+    <string name="settings_test_failed">Failed: %1$s</string>
+    <string name="settings_test_needs_key">Enter an API key first</string>
+    <string name="settings_tail_section">Tail habit</string>
+    <!-- Phase 15: compact settings row + searchable picker dialog (replaces inline chips) -->
+    <string name="settings_tail_row_label">Tail habit</string>
+    <string name="settings_tail_pick">Choose Tail habit</string>
+    <string name="settings_tail_search">Search habits</string>
+    <string name="settings_tail_loading">Loading Tail habits…</string>
+    <string name="settings_tail_not_installed">Tail not installed — install it to pick a habit. Sessions are still saved locally.</string>
+    <string name="settings_tail_no_match">No habits match</string>
+    <string name="settings_tail_retry">Retry</string>
+    <string name="settings_cancel">Cancel</string>
+
+    <!-- Video detail screen (Phase 12) -->
+    <string name="video_detail_back">Back</string>
+    <string name="video_detail_maximize">Maximize</string>
+    <string name="video_detail_play">Play</string>
+    <string name="video_detail_pause">Pause</string>
+    <string name="video_detail_play_from_start">From start</string>
+    <string name="video_detail_missing_files">No local video to play yet. Download it first.</string>
+    <string name="video_detail_retry_download">Retry download</string>
+    <string name="video_detail_analyzing">Analyzing…</string>
+    <string name="video_detail_legend_today">Already today</string>
+    <string name="video_detail_legend_video">This video</string>
+    <string name="video_detail_unknown">Unknown video 🐙</string>
+
+    <!-- Body-part detail screen (Phase 11; strings added Phase 13) -->
+    <string name="part_detail_title_fallback">Body part</string>
+    <string name="part_detail_back">Back</string>
+    <string name="part_detail_unknown">Unknown body part 🐙</string>
+    <string name="part_detail_videos_section">Videos stretching %1$s</string>
+    <string name="part_detail_videos_empty">No videos stretch this yet — analyze a video that targets it 🐙</string>
+    <string name="part_detail_stats_section">Stats</string>
+    <string name="part_detail_history_section">History</string>
+    <string name="part_detail_history_empty">Nothing logged yet 🐙</string>
+    <string name="part_detail_all_time">%1$d min all-time · %2$d sessions all-time</string>
+    <string name="part_detail_records">Personal records: best day %1$d min · longest gap %2$d days</string>
+    <string name="part_detail_active_days">active days</string>
+    <string name="part_detail_min_window">min · %1$s</string>
+    <string name="part_detail_sessions_window">sessions · %1$s</string>
+    <string name="part_detail_history_entry">%1$d min · %2$d %3$s</string>
+    <string name="part_detail_session_singular">session</string>
+    <string name="part_detail_session_plural">sessions</string>
+
+    <!-- Library backup (Phase 8, SAF) -->
+    <string name="settings_backup_section">Library backup</string>
+    <string name="settings_backup_hint">Export the list of video URLs to a JSON file, or restore rows from one. Restored videos are stream-only entries — download them from the Library when you want them offline.</string>
+    <string name="settings_backup_export">Export URLs…</string>
+    <string name="settings_backup_import">Import URLs…</string>
+    <string name="settings_backup_exported">Exported ✓</string>
+    <string name="settings_backup_imported">Imported %1$d new · %2$d already in library</string>
+    <string name="settings_backup_failed">Backup failed: %1$s</string>
+    <string name="settings_backup_mime">application/json</string>
+
+    <!-- Phase 22: explicit stretch confirmation + undo -->
+    <string name="player_confirm_title">Did you complete the stretches?</string>
+    <string name="player_confirm_body">🐙 %1$d min played — the octopus only counts stretches you actually did!</string>
+    <string name="player_confirm_yes">Yes, log it</string>
+    <string name="player_confirm_not_now">Not now</string>
+    <string name="player_pending_saved">Saved — log it later from the dashboard 🐙</string>
+    <string name="action_log_it">Log it</string>
+    <string name="action_discard">Discard</string>
+    <string name="action_undo">Undo</string>
+    <string name="action_log_all">Log all</string>
+    <string name="video_detail_pending_banner">⏳ Unlogged session · %1$d min</string>
+    <string name="body_pending_banner">⏳ %1$d unlogged stretch session%2$s · Review</string>
+    <string name="body_review_title">Unlogged sessions</string>
+    <string name="body_review_hint">Played but not yet counted — log the ones you actually did.</string>
+    <string name="body_discard_confirm_title">Discard this session?</string>
+    <string name="body_discard_confirm_body">The played minutes will be removed permanently — nothing gets logged anywhere.</string>
+    <string name="body_undo_title">Logged sessions</string>
+    <string name="body_undo_hint">Undo removes the minutes from this day. Tail can’t be un-counted — remove it in Tail if needed.</string>
+    <string name="body_undo_confirm_title">Undo this logged session?</string>
+    <string name="body_undo_confirm_body">%1$s (%2$d min) will be removed from this day’s totals. The Tail count can’t be undone — remove it in Tail if needed.</string>
+    <string name="body_undo_empty">Nothing logged on this day.</string>
+
+    <!-- Phase 24 (feedback round 5): part provenance + editable parts -->
+    <string name="part_source_ai">AI-analyzed</string>
+    <string name="part_source_heuristic">Quick scan</string>
+    <string name="part_source_manual">Edited</string>
+    <string name="video_detail_edit_parts">Edit parts</string>
+    <string name="edit_parts_title">Body parts for this video</string>
+    <string name="edit_parts_hint">Tick everything this video stretches — used for crediting sessions you log and coloring the octopus.</string>
+    <string name="edit_parts_save">Save</string>
+    <string name="edit_parts_cancel">Cancel</string>
+    <string name="edit_parts_manual_note">Manual edits survive everything except a new Analyze, which replaces them.</string>
+    <string name="analyze_manual_confirm_title">Re-analyze and replace edits?</string>
+    <string name="analyze_manual_confirm_body">This video\u2019s parts were edited by hand. Analyzing again will replace your manual selection with an automatic transcript scan.</string>
+    <string name="analyze_manual_confirm_ok">Analyze anyway</string>
+    <string name="credited_snapshot_note">Already-logged sessions keep their original credited parts — editing only affects future sessions.</string>
+</resources>

@@ -1,0 +1,80 @@
+<?xml version="1.0" encoding="utf-8"?>
+<manifest xmlns:android="http://schemas.android.com/apk/res/android"
+    xmlns:tools="http://schemas.android.com/tools">
+
+    <!-- LLM calls, YouTube metadata / thumbnails / transcripts, video downloads -->
+    <uses-permission android:name="android.permission.INTERNET" />
+
+    <!-- Tail habit integration (signature-level permission — docs/ARCHITECTURE.md §2) -->
+    <uses-permission android:name="com.example.tail.permission.TAIL_INTEGRATION" />
+
+    <!-- Package visibility (API 30+): the Tail app and its habit content provider -->
+    <queries>
+        <package android:name="com.example.tail" />
+        <provider android:authorities="com.example.tail.provider" />
+    </queries>
+
+    <!-- Portrait-locked phone app (Phase 15): every activity pins portrait, and
+         resizeableActivity=false keeps the lock honored on large screens where
+         Android 12+ otherwise ignores per-activity orientation. Trade-off: no
+         split-screen / multi-window support. -->
+    <application
+        android:name=".OctoApplication"
+        android:allowBackup="true"
+        android:dataExtractionRules="@xml/data_extraction_rules"
+        android:fullBackupContent="@xml/backup_rules"
+        android:icon="@mipmap/ic_launcher"
+        android:label="@string/app_name"
+        android:resizeableActivity="false"
+        android:roundIcon="@mipmap/ic_launcher_round"
+        android:supportsRtl="true"
+        android:theme="@style/Theme.Octo">
+        <activity
+            android:name=".MainActivity"
+            android:exported="true"
+            android:label="@string/app_name"
+            android:screenOrientation="portrait"
+            android:theme="@style/Theme.Octo"
+            android:windowSoftInputMode="adjustResize">
+            <intent-filter>
+                <action android:name="android.intent.action.MAIN" />
+
+                <category android:name="android.intent.category.LAUNCHER" />
+            </intent-filter>
+        </activity>
+
+        <!-- ACTION_SEND trampoline: YouTube app "Share" → Octo library
+             (docs/ARCHITECTURE.md §4.1 — translucent, noHistory, out of recents). -->
+        <activity
+            android:name=".youtube.ShareIngestActivity"
+            android:excludeFromRecents="true"
+            android:exported="true"
+            android:label="@string/share_activity_label"
+            android:noHistory="true"
+            android:screenOrientation="portrait"
+            android:taskAffinity=""
+            android:theme="@style/Theme.Octo.Translucent">
+            <intent-filter>
+                <action android:name="android.intent.action.SEND" />
+
+                <category android:name="android.intent.category.DEFAULT" />
+
+                <data android:mimeType="text/plain" />
+            </intent-filter>
+        </activity>
+
+        <!-- DEBUG-ONLY adb test hook (Phase 6): adb shell am start seeds daily
+             aggregates. exported is required for the shell to launch it, but the
+             BuildConfig.DEBUG guard in code makes it a no-op (instant finish) in
+             release builds. -->
+        <activity
+            android:name=".debug.DevSeedActivity"
+            android:excludeFromRecents="true"
+            android:exported="true"
+            android:noHistory="true"
+            android:screenOrientation="portrait"
+            android:taskAffinity=""
+            android:theme="@style/Theme.Octo.Translucent" />
+    </application>
+
+</manifest>

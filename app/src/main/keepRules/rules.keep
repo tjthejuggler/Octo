@@ -1,0 +1,39 @@
+# Octo R8 keep rules (Phase 8 release-readiness).
+# AGP combines every file in src/main/keepRules/ and passes them to R8.
+
+# ── NewPipeExtractor (JitPack) ────────────────────────────────────────────────
+# The extractor resolves streams through reflection over its service list and
+# JSoup-driven POJO mappers; obfuscation breaks stream/metadata extraction.
+-keep class org.schabi.newpipe.extractor.** { *; }
+-dontwarn org.schabi.newpipe.extractor.**
+# JSoup is used reflectively by the extractor's page parsers.
+-keep class org.jsoup.** { *; }
+-dontwarn org.jsoup.**
+# NanoHTTPD ships in the extractor jar (download tests only) — just silence.
+-dontwarn org.schabi.newpipe.**
+
+# ── kotlinx.serialization models ──────────────────────────────────────────────
+# Keep generated serializers for every @Serializable class in the app
+# (LlmClient.BodyPartAnalysis + the Phase 8 LibraryExport DTOs). The serializer
+# companion is looked up reflectively at runtime via `serializer()`.
+-keepattributes *Annotation*, InnerClasses, Signature
+-keepclassmembers class com.example.octo.** {
+    *** Companion;
+}
+-keepclasseswithmembers class com.example.octo.** {
+    kotlinx.serialization.KSerializer serializer(...);
+}
+# kotlinx-serialization runtime internals
+-keepclassmembers class kotlinx.serialization.json.** {
+    *** Companion;
+}
+-keepclasseswithmembers class kotlinx.serialization.json.** {
+    kotlinx.serialization.KSerializer serializer(...);
+}
+-dontwarn kotlinx.serialization.**
+
+# ── OkHttp / Retrofit platform bits (warnings only, but keep release logs clean)
+-dontwarn okhttp3.internal.platform.**
+-dontwarn org.conscrypt.**
+-dontwarn org.bouncycastle.**
+-dontwarn org.openjsse.**
