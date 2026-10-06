@@ -199,7 +199,13 @@ fun OctopusBodyView(
             val dx = (size.width - OctopusBodyGeometry.CANVAS_WIDTH * s) / 2f
             val dy = (size.height - OctopusBodyGeometry.CANVAS_HEIGHT * s) / 2f
             translate(left = dx, top = dy) {
-                scale(s, s) {
+                // FB26 fix: pivot MUST be the top-left — DrawScope.scale defaults to
+                // the CENTER of the (non-aspect-matched) cell, which shifted the whole
+                // drawing right + down and clipped the figures at the card bottom
+                // (dx/dy letterbox math and the hit-test inverse both assume top-left).
+                // The dashboard branch is unaffected: in an aspect-matched view the
+                // center pivot coincides with the canvas center.
+                scale(s, s, pivot = Offset.Zero) {
                     translate(left = -centeringOffsetX) {
                         drawBody(
                             animatedColors = animatedColors,
