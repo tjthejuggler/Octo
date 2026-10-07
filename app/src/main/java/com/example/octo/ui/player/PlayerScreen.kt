@@ -330,6 +330,36 @@ private fun FullscreenPlayerSurface(
             }
         }
 
+        // Small transparent timer card: session timer + timer pause/play toggle.
+        // Always visible (even when controls are hidden). Pausing here pauses BOTH
+        // the timer and the video; playing again resumes ONLY the timer — video
+        // playback is resumed by tapping the video itself.
+        Row(
+            verticalAlignment = Alignment.CenterVertically,
+            modifier = Modifier
+                .align(Alignment.TopEnd)
+                .padding(top = 88.dp, end = 16.dp)
+                .background(Color.Black.copy(alpha = 0.4f), MaterialTheme.shapes.large)
+                .padding(horizontal = 4.dp),
+        ) {
+            Text(
+                text = formatTimer(state.elapsedSeconds),
+                color = Color.White,
+                style = MaterialTheme.typography.titleMedium,
+                modifier = Modifier.padding(start = 12.dp),
+            )
+            IconButton(onClick = viewModel::toggleTimer) {
+                Icon(
+                    imageVector = if (state.timerPaused) Icons.Filled.PlayArrow else Icons.Filled.Pause,
+                    contentDescription = stringResource(
+                        if (state.timerPaused) R.string.player_resume_timer
+                        else R.string.player_pause_timer,
+                    ),
+                    tint = Color.White,
+                )
+            }
+        }
+
         if (controlsVisible) {
             val scrim = Modifier.background(Color.Black.copy(alpha = 0.55f))
             // Top: back + timer (system bars are hidden; pad generously for gestures).
@@ -452,11 +482,7 @@ private fun FullscreenPlayerSurface(
                     }
                     Spacer(Modifier.width(48.dp)) // balances the play/pause icon
                 }
-                Text(
-                    text = formatTimer(state.elapsedSeconds),
-                    color = Color.White,
-                    style = MaterialTheme.typography.bodyLarge,
-                )
+                // Session timer lives in the always-visible timer card (top-right).
             }
         }
 

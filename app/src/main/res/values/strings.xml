@@ -39,9 +39,11 @@
     <!-- Player screen (Phase 4) -->
     <string name="player_back">Back</string>
     <string name="player_loading">Loading…</string>
-    <string name="player_state_playing">Playing — timer running</string>
-    <string name="player_state_paused">Paused — timer held</string>
-    <string name="player_timer_hint">counts only while playing</string>
+    <string name="player_state_playing">Playing</string>
+    <string name="player_state_paused">Paused</string>
+    <string name="player_timer_hint">session timer keeps running while paused</string>
+    <string name="player_pause_timer">Pause session timer</string>
+    <string name="player_resume_timer">Resume session timer</string>
     <string name="player_finish">Finish Session</string>
     <string name="player_finished_title">Session saved 🐙</string>
     <string name="player_tail_sent">✓ Sent %1$d min to Tail (“%2$s”)</string>

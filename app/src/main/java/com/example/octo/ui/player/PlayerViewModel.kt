@@ -72,6 +72,8 @@ class PlayerViewModel(
         val settings: OctoSettings? = null,
         val elapsedSeconds: Int = 0,
         val isPlaying: Boolean = false,
+        /** True while the session timer is paused via the timer card button. */
+        val timerPaused: Boolean = false,
         val resolution: PlaybackResolution? = null, // null until resolve ran
         val finishState: SessionFinishState = SessionFinishState.Active,
         /** FB26: live media position/duration (ms) for the fullscreen seek bar. */
@@ -105,6 +107,10 @@ class PlayerViewModel(
     private var finishHandled = false
 
     init {
+        // The session timer runs wall-clock from screen entry: it keeps ticking
+        // while the video is paused (watch → pause → do the stretch), and is only
+        // stopped by the timer card's pause button or finishing the session.
+        startTimer()
         viewModelScope.launch {
             val video = sessionRepository.getVideo(videoId)
             if (video == null) {
@@ -141,6 +147,9 @@ class PlayerViewModel(
             exo.setMediaSource(resolution.source)
             exo.prepare()
             exo.playWhenReady = true
+            // Loop forever: end-of-media must NOT end the session; only the
+            // Finish Session button does (explicit user intent).
+            exo.repeatMode = Player.REPEAT_MODE_ONE
         }
         return exo
     }
@@ -148,14 +157,8 @@ class PlayerViewModel(
     private val listener = object : Player.Listener {
         override fun onIsPlayingChanged(isPlaying: Boolean) {
             _uiState.update { it.copy(isPlaying = isPlaying) }
-            if (isPlaying) startTimer() else stopTimer()
-        }
-
-        override fun onPlaybackStateChanged(playbackState: Int) {
-            // Natural end-of-media == session completion (task spec §3).
-            if (playbackState == Player.STATE_ENDED && !_uiState.value.isFinished) {
-                finish(userPressedFinish = true)
-            }
+            // Deliberately NOT tied to the timer: the session timer is wall-clock
+            // and keeps running while the video is paused.
         }
     }
 
@@ -189,7 +192,23 @@ class PlayerViewModel(
         }
     }
 
-    /** Timer ticks only while the player reports playing (pause = rest, not counted). */
+    /**
+     * Timer-card button: pauses the session timer AND the video playback;
+     * resuming restarts ONLY the timer — video playback is restarted the
+     * normal way (tapping the video).
+     */
+    fun toggleTimer() {
+        if (_uiState.value.timerPaused) {
+            _uiState.update { it.copy(timerPaused = false) }
+            startTimer()
+        } else {
+            _uiState.update { it.copy(timerPaused = true) }
+            stopTimer()
+            playerField?.pause()
+        }
+    }
+
+    /** Wall-clock session timer — runs regardless of video play/pause state. */
     private fun startTimer() {
         if (timerJob?.isActive == true) return
         timerJob = viewModelScope.launch {
