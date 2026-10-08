@@ -10,6 +10,7 @@ import com.example.octo.OctoApplication
 import com.example.octo.data.settings.SettingsRepository
 import com.example.octo.ipc.TailIntegrationClient
 import com.example.octo.llm.LlmClient
+import com.example.octo.work.ReanalyzeLibraryWorker
 import kotlinx.coroutines.Dispatchers
 import kotlinx.coroutines.flow.MutableStateFlow
 import kotlinx.coroutines.flow.SharingStarted
@@ -192,6 +193,37 @@ class SettingsViewModel(
         viewModelScope.launch { settingsRepository.setTailHabitName(name) }
     }
 
+    // ── Muscle layer: "Reanalyze library" ──
+
+    private val _reanalyzeStatus = MutableStateFlow<String?>(null)
+    /** One-line feedback for the reanalyze button ("queued" / error). */
+    val reanalyzeStatus: StateFlow<String?> = _reanalyzeStatus.asStateFlow()
+
+    /**
+     * Enqueues the unique [ReanalyzeLibraryWorker] — force re-runs body-part +
+     * muscle (vision when frames exist) analysis for every library video in the
+     * background. Requires a saved API key; use a vision-capable model in
+     * Settings for the frame analysis (otherwise muscle extraction is
+     * transcript-text-only).
+     */
+    fun reanalyzeLibrary() {
+        viewModelScope.launch {
+            val key = settingsRepository.settings.first().llmApiKey
+            if (key.isBlank()) {
+                _reanalyzeStatus.value = MESSAGE_NEEDS_KEY
+                return@launch
+            }
+            val workManager = androidx.work.WorkManager.getInstance(appContext)
+            val request = androidx.work.OneTimeWorkRequestBuilder<ReanalyzeLibraryWorker>().build()
+            workManager.enqueueUniqueWork(
+                ReanalyzeLibraryWorker.UNIQUE_NAME,
+                androidx.work.ExistingWorkPolicy.KEEP,
+                request,
+            )
+            _reanalyzeStatus.value = STATUS_REANALYZE_QUEUED
+        }
+    }
+
     /**
      * DEBUG-ONLY dev helper (Phase 6 task spec): seeds deterministic daily aggregates
      * so the body map / dashboard can be verified without playing a real session.
@@ -230,6 +262,7 @@ class SettingsViewModel(
         const val MESSAGE_NEEDS_KEY = "enter an API key first"
         const val STATUS_EXPORTED = "exported"
         const val STATUS_IMPORT_FORMAT = "imported:%d:%d"
+        const val STATUS_REANALYZE_QUEUED = "queued"
         private const val TAG = "SettingsViewModel"
 
         /** Factory pattern consistent with [com.example.octo.ui.library.LibraryViewModel.Factory]. */

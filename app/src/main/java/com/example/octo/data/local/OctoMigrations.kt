@@ -48,3 +48,29 @@ val MIGRATION_3_4: Migration = object : Migration(3, 4) {
         db.execSQL("ALTER TABLE videos ADD COLUMN partSource TEXT DEFAULT NULL")
     }
 }
+
+/**
+ * v4 → v5 (muscle layer): the video ↔ muscle detail cross-ref.
+ *
+ * Pure CREATE TABLE — existing rows are untouched and start with NO muscle
+ * links (empty = "not yet analyzed at muscle detail"; the Settings
+ * "Reanalyze library" action or per-video Analyze fills them when an LLM
+ * is configured). Matches [VideoMuscleCrossRef]'s Room-generated schema.
+ */
+val MIGRATION_4_5: Migration = object : Migration(4, 5) {
+    override fun migrate(db: SupportSQLiteDatabase) {
+        db.execSQL(
+            """
+            CREATE TABLE IF NOT EXISTS `video_muscle_cross_ref` (
+                `videoId` TEXT NOT NULL,
+                `muscleId` TEXT NOT NULL,
+                PRIMARY KEY(`videoId`, `muscleId`)
+            )
+            """.trimIndent()
+        )
+        db.execSQL(
+            "CREATE INDEX IF NOT EXISTS `index_video_muscle_cross_ref_muscleId` " +
+                "ON `video_muscle_cross_ref` (`muscleId`)"
+        )
+    }
+}

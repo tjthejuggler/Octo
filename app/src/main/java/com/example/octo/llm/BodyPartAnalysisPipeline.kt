@@ -3,6 +3,7 @@ package com.example.octo.llm
 import android.util.Log
 import com.example.octo.data.local.AnalysisState
 import com.example.octo.data.local.BodyPart
+import com.example.octo.data.local.Muscle
 import com.example.octo.data.local.PartSource
 import com.example.octo.data.local.OctoDatabase
 import com.example.octo.data.local.TranscriptSource
@@ -13,14 +14,19 @@ import com.example.octo.youtube.TranscriptFetcher
 import kotlinx.coroutines.Dispatchers
 import kotlinx.coroutines.flow.first
 import kotlinx.coroutines.withContext
+import java.io.File
 
 /**
  * Phase 5 orchestration (task spec §3): for one video —
  *
  * 1. fetch the transcript if the row doesn't have one ([TranscriptFetcher] fallback chain)
  * 2. classify into body-part ids: LLM when an API key is configured, else [LlmHeuristics]
- * 3. atomically replace [com.example.octo.data.local.VideoBodyPartCrossRef] rows
- * 4. mark [AnalysisState.DONE] (or FAILED with transcript left null when unobtainable)
+ * 3. muscle detail layer (LLM only): classify the exact stretched muscles from
+ *    video frames (vision) + transcript, and roll them UP into the body-part
+ *    categories so the 16-part system stays the single source of truth
+ * 4. atomically replace [com.example.octo.data.local.VideoBodyPartCrossRef] and
+ *    [com.example.octo.data.local.VideoMuscleCrossRef] rows
+ * 5. mark [AnalysisState.DONE] (or FAILED with transcript left null when unobtainable)
  *
  * `ensureAnalyzed` is idempotent (no-op when already DONE) and re-entrant-safe via the
  * RUNNING marker — a second trigger while RUNNING returns without duplicating work.
@@ -69,13 +75,20 @@ class BodyPartAnalysisPipeline(
 
                 // ── 2. classification (LLM if configured, else heuristics) ──
                 val settings: OctoSettings = settingsRepository.settings.first()
-                val analysis = if (settings.llmApiKey.isNotBlank()) {
+                val llmConfigured = settings.llmApiKey.isNotBlank()
+                val endpoint = if (llmConfigured) {
+                    LlmClient.Endpoint(
+                        baseUrl = settings.llmBaseUrl.ifBlank { SettingsRepository.DEFAULT_LLM_BASE_URL },
+                        apiKey = settings.llmApiKey,
+                        model = settings.llmModel.ifBlank { SettingsRepository.DEFAULT_LLM_MODEL },
+                    )
+                } else {
+                    null
+                }
+
+                val bodyPartAnalysis = if (endpoint != null) {
                     llmClient.classifyBodyParts(
-                        endpoint = LlmClient.Endpoint(
-                            baseUrl = settings.llmBaseUrl.ifBlank { SettingsRepository.DEFAULT_LLM_BASE_URL },
-                            apiKey = settings.llmApiKey,
-                            model = settings.llmModel.ifBlank { SettingsRepository.DEFAULT_LLM_MODEL },
-                        ),
+                        endpoint = endpoint,
                         transcript = transcript,
                         isTitleDescriptionOnly = source == TranscriptSource.TITLE_DESCRIPTION,
                     )
@@ -84,32 +97,50 @@ class BodyPartAnalysisPipeline(
                 }
 
                 // Normalize: map to the enum (drops anything unknown), keep canonical order.
-                val bodyParts = analysis.bodyParts
+                val bodyParts = bodyPartAnalysis.bodyParts
                     .mapNotNull { BodyPart.fromId(it) }
                     .toSet()
+                    .toMutableSet()
 
-                // ── 3. + 4. atomic link replace + state flip ──
+                // ── 3. muscle detail layer (LLM only; vision when frames available) ──
+                // A muscle-analysis failure is NOT fatal: the video keeps its
+                // body-part result and simply has no muscle detail yet.
+                val muscles = runCatching {
+                    if (endpoint != null) extractMuscles(endpoint, row.localFilePath, transcript)
+                    else emptyList()
+                }.getOrElse { t ->
+                    Log.w(TAG, "Muscle analysis failed for $videoId (non-fatal)", t)
+                    emptyList()
+                }
+
+                // Roll up: every identified muscle credits its parent body part
+                // category — the 16-part system stays the single source of truth.
+                muscles.forEach { bodyParts += it.parent }
+
+                // ── 4. + 5. atomic link replace + state flip ──
                 // Phase 24: provenance recorded so the UI can show "AI-analyzed"
                 // vs "Quick scan" per video. NOTE: a (re)analysis intentionally
                 // OVERWRITES a MANUAL selection — the Library shows a confirm
                 // dialog when partSource == MANUAL for that reason.
-                val provenance = if (settings.llmApiKey.isNotBlank()) {
+                val provenance = if (llmConfigured) {
                     PartSource.LLM
                 } else {
                     PartSource.HEURISTIC
                 }
                 db.withTransaction {
                     db.videoBodyPartDao().replaceForVideo(videoId, bodyParts.map { it.id })
+                    db.videoMuscleDao().replaceForVideo(videoId, muscles.map { it.id })
                     dao.updateAnalysisState(videoId, AnalysisState.DONE, now())
                     dao.updatePartSource(videoId, provenance)
                 }
                 Log.i(
                     TAG,
-                    "Analyzed %s: %d parts (%s) via %s".format(
+                    "Analyzed %s: %d parts, %d muscles (%s) via %s".format(
                         videoId,
                         bodyParts.size,
-                        bodyParts.joinToString { it.id },
-                        if (settings.llmApiKey.isNotBlank()) "llm" else "heuristic",
+                        muscles.size,
+                        muscles.joinToString { it.id },
+                        if (llmConfigured) "llm" else "heuristic",
                     ),
                 )
                 Outcome.ANALYZED
@@ -123,6 +154,27 @@ class BodyPartAnalysisPipeline(
                 Outcome.FAILED
             }
         }
+
+    /** All library video ids (newest first) — the reanalyze worker's job list. */
+    suspend fun allVideoIds(): List<String> = withContext(Dispatchers.IO) {
+        db.videoDao().getAllOnce().map { it.id }
+    }
+
+    /** One vision call with sampled frames; falls back to text-only when no local file. */
+    private fun extractMuscles(
+        endpoint: LlmClient.Endpoint,
+        localFilePath: String?,
+        transcript: String?,
+    ): List<Muscle> {
+        val frames = localFilePath
+            ?.let { File(it) }
+            ?.takeIf { it.isFile }
+            ?.let { VideoFrameExtractor.extractBase64Frames(it) }
+            .orEmpty()
+        Log.i(TAG, "Muscle analysis: ${frames.size} frames extracted")
+        val analysis = llmClient.classifyMuscles(endpoint, transcript, frames)
+        return analysis.muscles.mapNotNull { Muscle.fromId(it) }.distinct()
+    }
 
     private fun now(): Long = System.currentTimeMillis()
 

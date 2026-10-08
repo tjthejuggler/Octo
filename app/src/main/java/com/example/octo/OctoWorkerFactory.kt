@@ -5,6 +5,7 @@ import androidx.work.ListenableWorker
 import androidx.work.WorkerFactory
 import androidx.work.WorkerParameters
 import com.example.octo.work.DownloadVideoWorker
+import com.example.octo.work.ReanalyzeLibraryWorker
 
 /**
  * Manual-DI bridge so [CoroutineWorker]s receive dependencies from [OctoApplication.AppContainer]
@@ -19,6 +20,9 @@ class OctoWorkerFactory(private val container: OctoApplication.AppContainer) : W
     ): ListenableWorker? = when (workerClassName) {
         DownloadVideoWorker::class.java.name ->
             DownloadVideoWorker(appContext, workerParameters)
+
+        ReanalyzeLibraryWorker::class.java.name ->
+            ReanalyzeLibraryWorker(appContext, workerParameters, container.bodyPartAnalysisPipeline)
 
         else -> null // fall back to default reflective instantiation
     }

@@ -64,10 +64,11 @@ import com.example.octo.ui.components.OctoHeader
 
 /**
  * Settings (Phase 5, picker reworked Phase 15): LLM endpoint form (base URL /
- * API key / model), Save + inline "Test LLM" round-trip, and a compact Tail
+ * API key / model), Save + inline "Test LLM" round-trip, a compact Tail
  * habit row that opens a searchable habit-picker dialog fed by
  * [TailIntegrationClient][com.example.octo.ipc.TailIntegrationClient]'s provider
- * query. Replaces the Phase 2 placeholder per task spec §5.
+ * query, and (muscle layer) a "Reanalyze library" action that re-runs the
+ * body-part + muscle analysis for every library video in the background.
  */
 @OptIn(ExperimentalMaterial3Api::class)
 @Composable
@@ -83,6 +84,7 @@ fun SettingsScreen(
     val apiKey by viewModel.apiKey.collectAsState()
     val model by viewModel.model.collectAsState()
     val backupStatus by viewModel.backupStatus.collectAsState()
+    val reanalyzeStatus by viewModel.reanalyzeStatus.collectAsState()
     var saveFlash by remember { mutableStateOf(false) }
     var showHabitPicker by rememberSaveable { mutableStateOf(false) }
 
@@ -210,6 +212,40 @@ fun SettingsScreen(
                     }
 
                     TestLlmResult(testState)
+                }
+            }
+
+            // ── Muscle layer: reanalyze the whole library (vision-aware) ──
+            GlassCard(modifier = Modifier.fillMaxWidth()) {
+                Column(
+                    modifier = Modifier.padding(16.dp),
+                    verticalArrangement = Arrangement.spacedBy(12.dp),
+                ) {
+                    Text(
+                        text = stringResource(R.string.settings_reanalyze_section),
+                        style = MaterialTheme.typography.titleMedium,
+                    )
+                    Text(
+                        text = stringResource(R.string.settings_reanalyze_hint),
+                        style = MaterialTheme.typography.bodySmall,
+                        color = MaterialTheme.colorScheme.onSurfaceVariant,
+                    )
+                    OutlinedButton(onClick = { viewModel.reanalyzeLibrary() }) {
+                        Text(stringResource(R.string.settings_reanalyze_button))
+                    }
+                    when (reanalyzeStatus) {
+                        null -> Unit
+                        SettingsViewModel.MESSAGE_NEEDS_KEY -> Text(
+                            text = stringResource(R.string.settings_reanalyze_needs_key),
+                            color = MaterialTheme.colorScheme.error,
+                            style = MaterialTheme.typography.bodySmall,
+                        )
+                        SettingsViewModel.STATUS_REANALYZE_QUEUED -> Text(
+                            text = stringResource(R.string.settings_reanalyze_queued),
+                            color = MaterialTheme.colorScheme.primary,
+                            style = MaterialTheme.typography.bodySmall,
+                        )
+                    }
                 }
             }
 

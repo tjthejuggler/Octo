@@ -11,8 +11,9 @@ import androidx.room.RoomDatabase
         VideoBodyPartCrossRef::class,
         SessionEntity::class,
         BodyPartStretchEntity::class,
+        VideoMuscleCrossRef::class,
     ],
-    version = 4,
+    version = 5,
     exportSchema = true,
 )
 abstract class OctoDatabase : RoomDatabase() {
@@ -21,6 +22,7 @@ abstract class OctoDatabase : RoomDatabase() {
     abstract fun sessionDao(): SessionDao
     abstract fun bodyPartDao(): BodyPartDao
     abstract fun videoBodyPartDao(): VideoBodyPartDao
+    abstract fun videoMuscleDao(): VideoMuscleDao
 
     companion object {
         const val NAME = "octo.db"
@@ -40,7 +42,7 @@ object DatabaseProvider {
                 OctoDatabase::class.java,
                 OctoDatabase.NAME,
             )
-                .addMigrations(MIGRATION_1_2, MIGRATION_2_3, MIGRATION_3_4)
+                .addMigrations(MIGRATION_1_2, MIGRATION_2_3, MIGRATION_3_4, MIGRATION_4_5)
                 .build().also { instance = it }
         }
 }

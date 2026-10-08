@@ -388,12 +388,12 @@ private const val HITTEST_PAD = 2
 // so both sides render the character at identical size; the mantle ellipse is
 // a little shorter than the vector dome, which only shows as a soft rim when
 // the neck glow ring is up.
-private const val HEAD_CENTER_X = 500f
-private const val HEAD_DOME_CY = 283f
-private const val HEAD_DOME_H = 438f
+internal const val HEAD_CENTER_X = 500f
+internal const val HEAD_DOME_CY = 283f
+internal const val HEAD_DOME_H = 438f
 
 /** Per-side PPQ head-art placement metrics (raw-art pixel space). */
-private data class HeadArtMetrics(
+internal data class HeadArtMetrics(
     val w: Float,
     val h: Float,
     val domeCx: Float,
@@ -401,7 +401,7 @@ private data class HeadArtMetrics(
     val domeH: Float,
 )
 
-private val FrontHeadArt = HeadArtMetrics(
+internal val FrontHeadArt = HeadArtMetrics(
     w = 978f,
     h = 1085f,
     domeCx = 488.5f,
@@ -409,7 +409,7 @@ private val FrontHeadArt = HeadArtMetrics(
     domeH = 621f,
 )
 
-private val BackHeadArt = HeadArtMetrics(
+internal val BackHeadArt = HeadArtMetrics(
     w = 1092f,
     h = 1152f,
     domeCx = 531f,
@@ -420,7 +420,7 @@ private val BackHeadArt = HeadArtMetrics(
 )
 
 /** Small overflow so the art dome fully covers the vector dome (no rim peek). */
-private const val HEAD_MARGIN = 1.03f
+internal const val HEAD_MARGIN = 1.03f
 
 /** Geometry y below which suction cups belong to the limbs (head cups ≤ 555,
  *  limb cups ≥ 991 — any threshold in between is safe). */

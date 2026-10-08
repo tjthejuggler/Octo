@@ -136,6 +136,13 @@
     <string name="settings_backup_failed">Backup failed: %1$s</string>
     <string name="settings_backup_mime">application/json</string>
 
+    <!-- Muscle layer: reanalyze library -->
+    <string name="settings_reanalyze_section">Muscle analysis</string>
+    <string name="settings_reanalyze_hint">Re-runs body-part + exact-muscle analysis for every library video. Use a vision-enabled model above so video frames are analyzed — downloaded videos are sampled and sent to the model as stills. Runs in the background; each video updates as it finishes.</string>
+    <string name="settings_reanalyze_button">Reanalyze library</string>
+    <string name="settings_reanalyze_queued">Queued ✓ videos will re-analyze in the background 🐙</string>
+    <string name="settings_reanalyze_needs_key">Enter and save an API key first</string>
+
     <!-- Phase 22: explicit stretch confirmation + undo -->
     <string name="player_confirm_title">Did you complete the stretches?</string>
     <string name="player_confirm_body">🐙 %1$d min played — the octopus only counts stretches you actually did!</string>

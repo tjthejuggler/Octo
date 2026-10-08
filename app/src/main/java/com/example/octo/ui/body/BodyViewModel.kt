@@ -9,8 +9,10 @@ import com.example.octo.OctoApplication
 import com.example.octo.data.local.BodyPart
 import com.example.octo.data.local.BodyPartDao
 import com.example.octo.data.local.BodyPartStretchEntity
+import com.example.octo.data.local.Muscle
 import com.example.octo.data.local.SessionDao
 import com.example.octo.data.local.SessionWithTitle
+import com.example.octo.data.local.VideoMuscleDao
 import com.example.octo.data.repository.SessionRepository
 import com.example.octo.data.settings.SettingsRepository
 import com.example.octo.ipc.TailIntegrationClient
@@ -26,6 +28,7 @@ import kotlinx.coroutines.flow.asStateFlow
 import kotlinx.coroutines.flow.combine
 import kotlinx.coroutines.flow.firstOrNull
 import kotlinx.coroutines.flow.flatMapLatest
+import kotlinx.coroutines.flow.map
 import kotlinx.coroutines.flow.stateIn
 import kotlinx.coroutines.launch
 
@@ -38,10 +41,15 @@ import kotlinx.coroutines.launch
  * Streak/percent/totals are computed from BodyPartStretchEntity — which only
  * [SessionRepository.confirmSession] ever writes — so unconfirmed playback is
  * invisible here by construction.
+ *
+ * Muscle layer: [musclesByPart] carries the exact muscles stretched on the selected
+ * day (distinct muscle ids linked to videos with a CONFIRMED session that day),
+ * grouped under their parent body-part categories for the body-screen toggle.
  */
 @OptIn(ExperimentalCoroutinesApi::class)
 class BodyViewModel(
     private val bodyPartDao: BodyPartDao,
+    private val videoMuscleDao: VideoMuscleDao,
     private val sessionDao: SessionDao,
     private val sessionRepository: SessionRepository,
     private val settingsRepository: SettingsRepository,
@@ -54,6 +62,15 @@ class BodyViewModel(
 
     private val dayRows: Flow<List<BodyPartStretchEntity>> =
         _selectedDate.flatMapLatest { date -> bodyPartDao.forDay(date.iso()) }
+
+    private val dayMuscleIds: Flow<List<String>> =
+        _selectedDate.flatMapLatest { date ->
+            val zone = ZoneId.systemDefault()
+            videoMuscleDao.observeMusclesForDay(
+                dayStartMillis = date.atStartOfDay(zone).toInstant().toEpochMilli(),
+                dayEndMillis = date.plusDays(1).atStartOfDay(zone).toInstant().toEpochMilli() - 1,
+            )
+        }
 
     private val streakWindow: Flow<List<BodyPartStretchEntity>> =
         bodyPartDao.forRange(
@@ -101,6 +118,12 @@ class BodyViewModel(
                 streakDays = computeStreak(window),
             )
         }.stateIn(viewModelScope, SharingStarted.WhileSubscribed(5_000), Dashboard())
+
+    /** Exact muscles stretched on the selected day, grouped by parent category. */
+    val musclesByPart: StateFlow<Map<BodyPart, List<Muscle>>> =
+        dayMuscleIds
+            .map { ids -> ids.mapNotNull { Muscle.fromId(it) }.groupBy { it.parent } }
+            .stateIn(viewModelScope, SharingStarted.WhileSubscribed(5_000), emptyMap())
 
     // ── Phase 22 actions ──
 
@@ -176,6 +199,7 @@ class BodyViewModel(
                 val container = app.appContainer
                 BodyViewModel(
                     bodyPartDao = container.database.bodyPartDao(),
+                    videoMuscleDao = container.database.videoMuscleDao(),
                     sessionDao = container.database.sessionDao(),
                     sessionRepository = container.sessionRepository,
                     settingsRepository = container.settingsRepository,

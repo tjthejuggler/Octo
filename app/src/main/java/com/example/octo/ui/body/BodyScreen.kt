@@ -51,6 +51,7 @@ import androidx.compose.runtime.getValue
 import androidx.compose.runtime.mutableFloatStateOf
 import androidx.compose.runtime.mutableStateOf
 import androidx.compose.runtime.remember
+import androidx.compose.runtime.saveable.rememberSaveable
 import androidx.compose.runtime.rememberCoroutineScope
 import androidx.compose.runtime.setValue
 import androidx.compose.ui.graphics.graphicsLayer
@@ -80,6 +81,7 @@ import androidx.lifecycle.viewmodel.compose.viewModel
 import com.example.octo.R
 import com.example.octo.ui.components.OctoHeader
 import com.example.octo.data.local.BodyPart
+import com.example.octo.data.local.Muscle
 import com.example.octo.data.local.SessionWithTitle
 import androidx.compose.ui.res.stringResource
 import java.time.LocalDate
@@ -104,9 +106,12 @@ fun BodyScreen(
     viewModel: BodyViewModel = viewModel(factory = BodyViewModel.Factory),
 ) {
     val dashboard by viewModel.dashboard.collectAsState()
+    val musclesByPart by viewModel.musclesByPart.collectAsState()
     val pendingSessions by viewModel.pendingSessions.collectAsState()
     val confirmedToday by viewModel.confirmedForSelectedDay.collectAsState()
     var showPartsSheet by remember { mutableStateOf(false) }
+    var muscleMode by rememberSaveable { mutableStateOf(false) }
+    var muscleInfo by remember { mutableStateOf<Muscle?>(null) }
     var showReviewSheet by remember { mutableStateOf(false) }
     var showUndoSheet by remember { mutableStateOf(false) }
     var discardTarget by remember { mutableStateOf<SessionWithTitle?>(null) }
@@ -230,6 +235,9 @@ fun BodyScreen(
                 FlippableBodyView(
                     stretchedMinutes = dashboard.minutesByPart,
                     onRegionTap = onOpenPart,
+                    muscleMode = muscleMode,
+                    stretchedMuscles = musclesByPart.values.flatten().toSet(),
+                    onMuscleTap = { muscleInfo = it },
                     flipAngle = angleState,
                     side = currentSide,
                     onDragDelta = { deltaPx ->
@@ -264,13 +272,22 @@ fun BodyScreen(
             // Phase 20: side indicator — doubles as a tap-to-flip toggle so
             // the turn is discoverable even without knowing the swipe.
             // FB5: toggling animates through the same settle path.
-            SideIndicator(
-                side = currentSide,
-                onToggle = { flipTo(if (currentSide == OctopusBodyGeometry.Side.FRONT) 1 else -1) },
+            Row(
                 modifier = Modifier
                     .align(Alignment.BottomCenter)
                     .padding(bottom = 2.dp),
-            )
+                verticalAlignment = Alignment.CenterVertically,
+                horizontalArrangement = Arrangement.spacedBy(8.dp),
+            ) {
+                MuscleModePill(
+                    muscleMode = muscleMode,
+                    onToggle = { muscleMode = !muscleMode },
+                )
+                SideIndicator(
+                    side = currentSide,
+                    onToggle = { flipTo(if (currentSide == OctopusBodyGeometry.Side.FRONT) 1 else -1) },
+                )
+            }
         }
 
         Spacer(Modifier.height(8.dp))
@@ -279,6 +296,9 @@ fun BodyScreen(
     if (showPartsSheet) {
         PartsSheet(
             minutesByPart = dashboard.minutesByPart,
+            musclesByPart = musclesByPart,
+            muscleMode = muscleMode,
+            onMuscleModeChange = { muscleMode = it },
             onPartTap = { part ->
                 showPartsSheet = false
                 onOpenPart(part)
@@ -351,6 +371,34 @@ fun BodyScreen(
             },
             dismissButton = {
                 TextButton(onClick = { undoTarget = null }) { Text("Cancel") }
+            },
+        )
+    }
+
+    // Muscle-mode tap: name + parent category + today status.
+    muscleInfo?.let { muscle ->
+        AlertDialog(
+            onDismissRequest = { muscleInfo = null },
+            title = { Text(muscle.displayName) },
+            text = {
+                Text(
+                    "Category: " + muscle.parent.displayName +
+                        if (dashboard.minutesByPart[muscle.parent] != null) {
+                            "\nStretched today ✓"
+                        } else {
+                            ""
+                        }
+                )
+            },
+            confirmButton = {
+                TextButton(onClick = {
+                    val part = muscle.parent
+                    muscleInfo = null
+                    onOpenPart(part)
+                }) { Text("Open " + muscle.parent.displayName) }
+            },
+            dismissButton = {
+                TextButton(onClick = { muscleInfo = null }) { Text("Close") }
             },
         )
     }
@@ -688,10 +736,14 @@ private fun CornerStat(
 @Composable
 private fun PartsSheet(
     minutesByPart: Map<BodyPart, Int>,
+    musclesByPart: Map<BodyPart, List<Muscle>>,
+    muscleMode: Boolean,
+    onMuscleModeChange: (Boolean) -> Unit,
     onPartTap: (BodyPart) -> Unit,
     onDismiss: () -> Unit,
 ) {
     val sheetState = rememberModalBottomSheetState(skipPartiallyExpanded = false)
+    val showMuscles = muscleMode
     ModalBottomSheet(
         onDismissRequest = onDismiss,
         sheetState = sheetState,
@@ -703,12 +755,66 @@ private fun PartsSheet(
                 .verticalScroll(rememberScrollState())
                 .padding(start = 20.dp, end = 20.dp, bottom = 20.dp),
         ) {
-            Text(
-                text = "Body parts",
-                style = MaterialTheme.typography.titleMedium,
-                fontWeight = FontWeight.Bold,
+            Row(
+                verticalAlignment = Alignment.CenterVertically,
                 modifier = Modifier.padding(bottom = 10.dp),
+            ) {
+                Text(
+                    text = if (showMuscles) "Exact muscles" else "Body parts",
+                    style = MaterialTheme.typography.titleMedium,
+                    fontWeight = FontWeight.Bold,
+                    modifier = Modifier.weight(1f),
+                )
+                PartsMusclesToggle(showMuscles = showMuscles, onToggle = { onMuscleModeChange(!showMuscles) })
+            }
+            if (showMuscles) {
+                MuscleList(
+                    musclesByPart = musclesByPart,
+                    onPartTap = onPartTap,
+                )
+            } else {
+                PartsList(minutesByPart = minutesByPart, onPartTap = onPartTap)
+            }
+        }
+    }
+}
+
+/** Segmented Parts / Muscles pill — the body screen's exact-muscle toggle. */
+@Composable
+private fun PartsMusclesToggle(showMuscles: Boolean, onToggle: () -> Unit) {
+    Surface(
+        shape = RoundedCornerShape(16.dp),
+        color = MaterialTheme.colorScheme.surfaceVariant.copy(alpha = 0.55f),
+    ) {
+        Row(
+            modifier = Modifier
+                .clickable(onClick = onToggle)
+                .padding(horizontal = 10.dp, vertical = 4.dp),
+            verticalAlignment = Alignment.CenterVertically,
+            horizontalArrangement = Arrangement.spacedBy(8.dp),
+        ) {
+            Text(
+                text = "Parts",
+                style = MaterialTheme.typography.labelMedium,
+                fontWeight = if (showMuscles) FontWeight.Normal else FontWeight.Bold,
+                color = if (showMuscles) MaterialTheme.colorScheme.onSurfaceVariant else OctoBodyTeal,
             )
+            Text(
+                text = "Muscles",
+                style = MaterialTheme.typography.labelMedium,
+                fontWeight = if (showMuscles) FontWeight.Bold else FontWeight.Normal,
+                color = if (showMuscles) OctoBodyTeal else MaterialTheme.colorScheme.onSurfaceVariant,
+            )
+        }
+    }
+}
+
+/** The original 16-part grid, extracted from the sheet body. */
+@Composable
+private fun PartsList(
+    minutesByPart: Map<BodyPart, Int>,
+    onPartTap: (BodyPart) -> Unit,
+) {
             BodyPart.entries.chunked(2).forEach { rowParts ->
                 Row(
                     modifier = Modifier.fillMaxWidth(),
@@ -725,6 +831,59 @@ private fun PartsSheet(
                     // Odd row count padding (16 is even, but stay robust).
                     if (rowParts.size == 1) Spacer(Modifier.weight(1f))
                 }
+            }
+}
+
+/**
+ * Exact muscles stretched on the selected day (from confirmed sessions'
+ * videos), grouped under their parent body-part category. Tapping a muscle
+ * opens its parent category's detail screen. Empty state points at the
+ * Settings reanalyze action — the muscle layer only fills in once the
+ * library has been analyzed with an LLM (vision model for frame analysis).
+ */
+@Composable
+private fun MuscleList(
+    musclesByPart: Map<BodyPart, List<Muscle>>,
+    onPartTap: (BodyPart) -> Unit,
+) {
+    if (musclesByPart.isEmpty()) {
+        Text(
+            text = "No muscle detail yet — analyze your library (Settings → Reanalyze library) with a vision-enabled model to see the exact muscles 🐙",
+            style = MaterialTheme.typography.bodyMedium,
+            color = MaterialTheme.colorScheme.onSurfaceVariant,
+            modifier = Modifier.padding(vertical = 16.dp),
+        )
+        return
+    }
+    musclesByPart.forEach { (part, muscles) ->
+        Text(
+            text = part.displayName,
+            style = MaterialTheme.typography.labelMedium,
+            fontWeight = FontWeight.Bold,
+            color = OctoBodyTeal,
+            modifier = Modifier.padding(top = 10.dp, bottom = 4.dp),
+        )
+        muscles.sortedBy { it.displayName }.forEach { muscle ->
+            Row(
+                verticalAlignment = Alignment.CenterVertically,
+                modifier = Modifier
+                    .fillMaxWidth()
+                    .clip(RoundedCornerShape(10.dp))
+                    .clickable { onPartTap(part) }
+                    .padding(horizontal = 6.dp, vertical = 6.dp),
+            ) {
+                Box(
+                    modifier = Modifier
+                        .size(10.dp)
+                        .clip(CircleShape)
+                        .background(OctoBodyTeal.copy(alpha = 0.75f)),
+                )
+                Spacer(Modifier.width(8.dp))
+                Text(
+                    text = muscle.displayName,
+                    style = MaterialTheme.typography.bodyMedium,
+                    modifier = Modifier.weight(1f),
+                )
             }
         }
     }
@@ -842,6 +1001,9 @@ private fun FlippableBodyView(
     side: OctopusBodyGeometry.Side,
     onDragDelta: (Float) -> Unit,
     onSettle: (flickBiasDegPerSec: Float) -> Unit,
+    muscleMode: Boolean = false,
+    stretchedMuscles: Set<Muscle> = emptySet(),
+    onMuscleTap: (Muscle) -> Unit = {},
 ) {
     val density = LocalDensity.current
     // Captured once (composable context) — the gesture callbacks are non-composable.
@@ -877,11 +1039,59 @@ private fun FlippableBodyView(
             },
         contentAlignment = Alignment.Center,
     ) {
-        OctopusBodyView(
-            stretchedMinutes = stretchedMinutes,
-            onRegionTap = onRegionTap,
-            side = side,
-        )
+        if (muscleMode) {
+            MuscleFigureView(
+                stretchedMuscles = stretchedMuscles,
+                side = if (side == OctopusBodyGeometry.Side.BACK) {
+                    MuscleBodyGeometry.Side.BACK
+                } else {
+                    MuscleBodyGeometry.Side.FRONT
+                },
+                onMuscleTap = onMuscleTap,
+            )
+        } else {
+            OctopusBodyView(
+                stretchedMinutes = stretchedMinutes,
+                onRegionTap = onRegionTap,
+                side = side,
+            )
+        }
+    }
+}
+
+/**
+ * The figure-level Parts / Muscles toggle: swaps the octopus man for the
+ * anatomical muscle diagram (and back). Teal when the muscle view is active.
+ */
+@Composable
+private fun MuscleModePill(
+    muscleMode: Boolean,
+    onToggle: () -> Unit,
+) {
+    Surface(
+        shape = RoundedCornerShape(16.dp),
+        color = MaterialTheme.colorScheme.surface.copy(alpha = 0.85f),
+    ) {
+        Row(
+            modifier = Modifier
+                .clickable(onClick = onToggle)
+                .padding(horizontal = 12.dp, vertical = 4.dp),
+            verticalAlignment = Alignment.CenterVertically,
+            horizontalArrangement = Arrangement.spacedBy(6.dp),
+        ) {
+            Box(
+                modifier = Modifier
+                    .size(7.dp)
+                    .clip(CircleShape)
+                    .background(if (muscleMode) OctoBodyTeal else MaterialTheme.colorScheme.surfaceVariant),
+            )
+            Text(
+                text = if (muscleMode) "Muscles" else "Octo man",
+                style = MaterialTheme.typography.labelMedium,
+                fontWeight = FontWeight.Bold,
+                color = if (muscleMode) OctoBodyTeal else MaterialTheme.colorScheme.onSurfaceVariant,
+            )
+        }
     }
 }
 
