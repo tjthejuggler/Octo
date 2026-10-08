@@ -78,6 +78,7 @@ import androidx.compose.ui.text.style.TextAlign
 import androidx.compose.ui.unit.dp
 import androidx.lifecycle.viewmodel.compose.viewModel
 import com.example.octo.R
+import com.example.octo.ui.components.OctoHeader
 import com.example.octo.data.local.BodyPart
 import com.example.octo.data.local.SessionWithTitle
 import androidx.compose.ui.res.stringResource
@@ -167,16 +168,20 @@ fun BodyScreen(
             .padding(horizontal = 12.dp),
         horizontalAlignment = Alignment.CenterHorizontally,
     ) {
-        TitleBar(
-            date = dashboard.selectedDate,
-            isToday = dashboard.isToday,
-            showUndo = confirmedToday.isNotEmpty(),
-            onShowUndo = { showUndoSheet = true },
-            onPrevious = viewModel::selectPreviousDay,
-            onNext = viewModel::selectNextDay,
-            onToday = viewModel::backToToday,
-            onShowParts = { showPartsSheet = true },
-        )
+        // Single shared header (leading cluster identical across all tabs);
+        // date-nav controls ride along as trailing actions.
+        OctoHeader(title = "Octo") {
+            TitleBarActions(
+                date = dashboard.selectedDate,
+                isToday = dashboard.isToday,
+                showUndo = confirmedToday.isNotEmpty(),
+                onShowUndo = { showUndoSheet = true },
+                onPrevious = viewModel::selectPreviousDay,
+                onNext = viewModel::selectNextDay,
+                onToday = viewModel::backToToday,
+                onShowParts = { showPartsSheet = true },
+            )
+        }
 
         // Phase 22: subtle banner whenever any played-but-unlogged session exists.
         if (pendingSessions.isNotEmpty()) {
@@ -482,8 +487,13 @@ private fun Long.toLocalDateLabel(): String = try {
 }
 
 /** One compact row: mascot, title, inline date navigation, and the parts tag button. */
+/**
+ * Trailing controls that ride inside the shared [com.example.octo.ui.components.OctoHeader]
+ * on the dashboard: Today jump, undo affordance (Phase 22), parts sheet button
+ * (Phase 14), and the prev/label/next date navigator.
+ */
 @Composable
-private fun TitleBar(
+private fun TitleBarActions(
     date: LocalDate,
     isToday: Boolean,
     showUndo: Boolean,
@@ -493,76 +503,55 @@ private fun TitleBar(
     onToday: () -> Unit,
     onShowParts: () -> Unit,
 ) {
-    Row(
-        modifier = Modifier
-            .fillMaxWidth()
-            .padding(top = 8.dp),
-        verticalAlignment = Alignment.CenterVertically,
-    ) {
-        Image(
-            painter = painterResource(R.drawable.octo_mascot),
-            contentDescription = null, // decorative
-            contentScale = ContentScale.Crop,
-            modifier = Modifier
-                .size(32.dp)
-                .clip(RoundedCornerShape(9.dp)),
-        )
-        Spacer(Modifier.width(8.dp))
-        Text("Octo", style = MaterialTheme.typography.titleLarge, fontWeight = FontWeight.Bold)
-        Spacer(Modifier.width(10.dp))
-        if (!isToday) {
-            TextButton(
-                onClick = onToday,
-                contentPadding = PaddingValues(horizontal = 8.dp),
-            ) {
-                Text("Today", style = MaterialTheme.typography.labelMedium)
-            }
+    if (!isToday) {
+        TextButton(
+            onClick = onToday,
+            contentPadding = PaddingValues(horizontal = 8.dp),
+        ) {
+            Text("Today", style = MaterialTheme.typography.labelMedium)
         }
-        Spacer(Modifier.weight(1f))
-        // Phase 14: discreet tag button replacing the always-on legend grid —
-        // opens the parts bottom sheet.
-        // Phase 22: undo affordance — shown only when the viewed day has logged sessions.
-        if (showUndo) {
-            IconButton(
-                onClick = onShowUndo,
-                modifier = Modifier
-                    .size(32.dp)
-                    .alpha(0.75f)
-                    .semantics { contentDescription = "Undo logged sessions for this day" },
-            ) {
-                Icon(
-                    imageVector = Icons.Outlined.History,
-                    contentDescription = null,
-                    modifier = Modifier.size(18.dp),
-                )
-            }
-        }
+    }
+    // Phase 22: undo affordance — shown only when the viewed day has logged sessions.
+    if (showUndo) {
         IconButton(
-            onClick = onShowParts,
+            onClick = onShowUndo,
             modifier = Modifier
                 .size(32.dp)
                 .alpha(0.75f)
-                .semantics { contentDescription = "Show body parts legend" },
+                .semantics { contentDescription = "Undo logged sessions for this day" },
         ) {
             Icon(
-                imageVector = Icons.Outlined.Sell,
+                imageVector = Icons.Outlined.History,
                 contentDescription = null,
                 modifier = Modifier.size(18.dp),
             )
         }
-        IconButton(onClick = onPrevious, modifier = Modifier.size(36.dp)) {
-            Icon(Icons.AutoMirrored.Filled.KeyboardArrowLeft, contentDescription = "Previous day")
-        }
-        Text(
-            text = dateLabel(date),
-            style = MaterialTheme.typography.titleSmall,
-            textAlign = TextAlign.Center,
-            maxLines = 1,
-            modifier = Modifier.width(128.dp),
+    }
+    IconButton(
+        onClick = onShowParts,
+        modifier = Modifier
+            .size(32.dp)
+            .alpha(0.75f)
+            .semantics { contentDescription = "Show body parts legend" },
+    ) {
+        Icon(
+            imageVector = Icons.Outlined.Sell,
+            contentDescription = null,
+            modifier = Modifier.size(18.dp),
         )
-        IconButton(onClick = onNext, enabled = !isToday, modifier = Modifier.size(36.dp)) {
-            Icon(Icons.AutoMirrored.Filled.KeyboardArrowRight, contentDescription = "Next day")
-        }
+    }
+    IconButton(onClick = onPrevious, modifier = Modifier.size(36.dp)) {
+        Icon(Icons.AutoMirrored.Filled.KeyboardArrowLeft, contentDescription = "Previous day")
+    }
+    Text(
+        text = dateLabel(date),
+        style = MaterialTheme.typography.titleSmall,
+        textAlign = TextAlign.Center,
+        maxLines = 1,
+        modifier = Modifier.width(128.dp),
+    )
+    IconButton(onClick = onNext, enabled = !isToday, modifier = Modifier.size(36.dp)) {
+        Icon(Icons.AutoMirrored.Filled.KeyboardArrowRight, contentDescription = "Next day")
     }
 }
 

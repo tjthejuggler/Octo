@@ -5,6 +5,8 @@ import android.os.Bundle
 import androidx.activity.ComponentActivity
 import androidx.activity.compose.setContent
 import androidx.activity.enableEdgeToEdge
+import androidx.compose.foundation.isSystemInDarkTheme
+import androidx.compose.foundation.layout.Box
 import androidx.compose.foundation.layout.fillMaxSize
 import androidx.compose.foundation.layout.padding
 import androidx.compose.material3.Scaffold
@@ -15,12 +17,14 @@ import androidx.navigation.NavGraph.Companion.findStartDestination
 import androidx.navigation.NavHostController
 import androidx.navigation.compose.currentBackStackEntryAsState
 import androidx.navigation.compose.rememberNavController
+import com.example.octo.ui.components.OctoBackground
 import com.example.octo.ui.navigation.OctoBottomBar
 import com.example.octo.ui.navigation.OctoDestination
 import com.example.octo.ui.navigation.OctoNavHost
 import com.example.octo.ui.navigation.PART_ROUTE_BASE
 import com.example.octo.ui.navigation.PLAYER_ROUTE_BASE
 import com.example.octo.ui.navigation.VIDEO_ROUTE_BASE
+import androidx.compose.ui.graphics.Color
 import com.example.octo.ui.theme.OctoTheme
 
 class MainActivity : ComponentActivity() {
@@ -64,22 +68,30 @@ fun OctoApp() {
         currentRoute?.startsWith(PART_ROUTE_BASE) != true &&
         currentRoute?.startsWith(VIDEO_ROUTE_BASE) != true
 
-    Scaffold(
-        modifier = Modifier.fillMaxSize(),
-        bottomBar = {
-            if (showBottomBar) {
-                OctoBottomBar(
-                    destinations = OctoDestination.entries.toList(),
-                    currentRoute = currentRoute,
-                    onNavigate = { destination -> navigateToTab(navController, destination) },
-                )
-            }
-        },
-    ) { innerPadding ->
-        OctoNavHost(
-            navController = navController,
-            modifier = Modifier.padding(innerPadding),
-        )
+    val darkTheme = isSystemInDarkTheme()
+
+    // One ambient underwater backdrop behind every destination; screens render
+    // on top with transparent backgrounds.
+    Box(modifier = Modifier.fillMaxSize()) {
+        OctoBackground(darkTheme = darkTheme, modifier = Modifier.fillMaxSize())
+        Scaffold(
+            modifier = Modifier.fillMaxSize(),
+            containerColor = Color.Transparent,
+            bottomBar = {
+                if (showBottomBar) {
+                    OctoBottomBar(
+                        destinations = OctoDestination.entries.toList(),
+                        currentRoute = currentRoute,
+                        onNavigate = { destination -> navigateToTab(navController, destination) },
+                    )
+                }
+            },
+        ) { innerPadding ->
+            OctoNavHost(
+                navController = navController,
+                modifier = Modifier.padding(innerPadding),
+            )
+        }
     }
 }
 

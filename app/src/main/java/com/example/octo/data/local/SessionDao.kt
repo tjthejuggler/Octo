@@ -15,6 +15,12 @@ data class SessionWithTitle(
     val durationSeconds: Int,
 )
 
+/** Per-video most-recent session timestamp — input for the library "Recently done" sort. */
+data class VideoLastPlayedRow(
+    val videoId: String,
+    val lastPlayedAt: Long,
+)
+
 @Dao
 interface SessionDao {
 
@@ -61,6 +67,10 @@ interface SessionDao {
         """
     )
     fun pendingForVideo(videoId: String): Flow<List<SessionWithTitle>>
+
+    /** Most recent session per video — the library "Recently done" sort. */
+    @Query("SELECT videoId, MAX(startedAt) AS lastPlayedAt FROM sessions GROUP BY videoId")
+    fun lastPlayedPerVideo(): Flow<List<VideoLastPlayedRow>>
 
     /** Confirmed sessions on one local day — the per-day undo sheet (Phase 22). */
     @Query(

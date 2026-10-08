@@ -51,6 +51,7 @@ import androidx.lifecycle.viewmodel.compose.viewModel
 import com.example.octo.R
 import com.example.octo.data.local.BodyPart
 import com.example.octo.ui.body.OctoBodyGreen
+import com.example.octo.ui.components.OctoHeader
 import com.example.octo.ui.body.OctoBodyTeal
 import com.example.octo.ui.body.octoRegionColor
 
@@ -76,7 +77,7 @@ fun StatsScreen(
             .padding(horizontal = 16.dp),
         horizontalAlignment = Alignment.CenterHorizontally,
     ) {
-        StatsHeader()
+        OctoHeader(title = "Stats", subtitle = "how the octopus is unwinding")
         RangeChips(
             selected = state.range,
             onSelect = viewModel::selectRange,
@@ -109,35 +110,11 @@ fun StatsScreen(
                 )
             }
         }
-        Spacer(Modifier.height(24.dp))
-    }
-}
 
-@Composable
-private fun StatsHeader() {
-    Row(
-        modifier = Modifier
-            .fillMaxWidth()
-            .padding(top = 12.dp),
-        verticalAlignment = Alignment.CenterVertically,
-    ) {
-        Image(
-            painter = painterResource(R.drawable.octo_mascot),
-            contentDescription = null, // decorative
-            contentScale = ContentScale.Crop,
-            modifier = Modifier
-                .size(44.dp)
-                .clip(RoundedCornerShape(12.dp)),
-        )
-        Spacer(Modifier.width(10.dp))
-        Column {
-            Text("Stats", style = MaterialTheme.typography.headlineSmall, fontWeight = FontWeight.Bold)
-            Text(
-                "how the octopus is unwinding",
-                style = MaterialTheme.typography.bodySmall,
-                color = MaterialTheme.colorScheme.onSurfaceVariant,
-            )
-        }
+        // Library coverage is independent of the session window — always visible.
+        Spacer(Modifier.height(12.dp))
+        LibraryCoverageCard(parts = state.libraryParts, loading = state.loading)
+        Spacer(Modifier.height(24.dp))
     }
 }
 
@@ -477,6 +454,110 @@ private fun NeglectedCallout(neglected: List<PartStat>, windowLabel: String) {
         }
     }
 }
+
+/**
+ * Library coverage: how many videos in the library cover each body part,
+ * scarcest first — the top of the list is your shopping list for new videos.
+ */
+@Composable
+private fun LibraryCoverageCard(parts: List<LibraryPartStat>, loading: Boolean) {
+    val missing = parts.filter { it.videoCount == 0 }
+    val total = parts.sumOf { it.videoCount }
+    Card(
+        modifier = Modifier.fillMaxWidth(),
+        colors = CardDefaults.cardColors(
+            containerColor = MaterialTheme.colorScheme.surfaceVariant.copy(alpha = 0.4f),
+        ),
+    ) {
+        Column(Modifier.padding(12.dp)) {
+            Text("Library coverage", style = MaterialTheme.typography.titleMedium, fontWeight = FontWeight.SemiBold)
+            Text(
+                "videos per body part · scarcest first",
+                style = MaterialTheme.typography.bodySmall,
+                color = MaterialTheme.colorScheme.onSurfaceVariant,
+            )
+            Spacer(Modifier.height(8.dp))
+            if (loading && parts.isEmpty()) {
+                Text(
+                    "counting tentacles… 🐙",
+                    style = MaterialTheme.typography.bodySmall,
+                    color = MaterialTheme.colorScheme.onSurfaceVariant,
+                )
+            } else {
+                val maxCount = parts.maxOfOrNull { it.videoCount } ?: 0
+                parts.forEach { p ->
+                    LibraryPartRow(stat = p, fraction = if (maxCount == 0) 0f else p.videoCount.toFloat() / maxCount)
+                }
+                Spacer(Modifier.height(6.dp))
+                Text(
+                    if (missing.isEmpty()) {
+                        "🐙 Every body part has at least one video — well-stocked larder!"
+                    } else {
+                        "🦑 No videos yet for: ${missing.joinToString { it.part.displayName }} — go hunt some down!"
+                    },
+                    style = MaterialTheme.typography.bodySmall,
+                    color = MaterialTheme.colorScheme.onSurfaceVariant,
+                )
+            }
+            if (total > 0) {
+                Spacer(Modifier.height(2.dp))
+                Text(
+                    "$total tags across ${parts.count { it.videoCount > 0 }} of ${parts.size} parts",
+                    style = MaterialTheme.typography.labelSmall,
+                    color = MaterialTheme.colorScheme.onSurfaceVariant,
+                )
+            }
+        }
+    }
+}
+
+@Composable
+private fun LibraryPartRow(stat: LibraryPartStat, fraction: Float) {
+    val idleColor = MaterialTheme.colorScheme.surfaceVariant.copy(alpha = 0.45f)
+    Row(
+        modifier = Modifier.fillMaxWidth().padding(vertical = 3.dp),
+        verticalAlignment = Alignment.CenterVertically,
+    ) {
+        Text(
+            text = stat.part.displayName,
+            style = MaterialTheme.typography.labelMedium,
+            color = if (stat.videoCount > 0) {
+                MaterialTheme.colorScheme.onSurface
+            } else {
+                MaterialTheme.colorScheme.onSurfaceVariant.copy(alpha = 0.7f)
+            },
+            maxLines = 1,
+            overflow = TextOverflow.Ellipsis,
+            modifier = Modifier.width(118.dp),
+        )
+        Box(
+            modifier = Modifier
+                .weight(1f)
+                .height(12.dp)
+                .clip(RoundedCornerShape(6.dp))
+                .background(idleColor),
+        ) {
+            if (fraction > 0f) {
+                Box(
+                    modifier = Modifier
+                        .fillMaxWidth(fraction)
+                        .fillMaxHeight()
+                        .background(octoRegionColor(stat.videoCount)),
+                )
+            }
+        }
+        Spacer(Modifier.width(8.dp))
+        Text(
+            text = plural(stat.videoCount),
+            style = MaterialTheme.typography.labelSmall,
+            color = MaterialTheme.colorScheme.onSurfaceVariant,
+            modifier = Modifier.width(58.dp),
+            textAlign = TextAlign.End,
+        )
+    }
+}
+
+private fun plural(count: Int): String = if (count == 1) "1 video" else "$count videos"
 
 /** Phase 4 raw-session sanity line (not a reconciliation — just a cross-check). */
 @Composable

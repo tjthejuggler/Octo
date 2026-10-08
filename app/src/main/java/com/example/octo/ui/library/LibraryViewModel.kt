@@ -10,9 +10,13 @@ import androidx.work.WorkManager
 import com.example.octo.OctoApplication
 import com.example.octo.data.local.AnalysisState
 import com.example.octo.data.local.BodyPart
+import com.example.octo.data.local.BodyPartDao
 import com.example.octo.data.local.DownloadState
 import com.example.octo.data.local.VideoEntity
+import com.example.octo.data.repository.VideoRepository
 import com.example.octo.work.DownloadVideoWorker
+import java.time.LocalDate
+import java.time.format.DateTimeFormatter
 import kotlinx.coroutines.flow.Flow
 import kotlinx.coroutines.flow.MutableStateFlow
 import kotlinx.coroutines.flow.SharingStarted
@@ -26,9 +30,26 @@ import kotlinx.coroutines.launch
  * Library presentation state: DB rows merged with live WorkManager progress so the
  * "Downloading…" chips show real byte progress without polling the DB.
  */
+/** Library sort modes (chips under the filter row). */
+enum class LibrarySort(val label: String) {
+    /** Newest library additions first (the historical default). */
+    NEWEST("Newest"),
+
+    /** Videos you played most recently first (never-played sink to the end). */
+    RECENTLY_DONE("Recently done"),
+
+    /**
+     * Videos covering the most body parts you have NOT stretched today first —
+     * the "what should I do next" recommendation sort. Ties break by addedAt.
+     */
+    MOST_NEEDED("Most needed"),
+}
+
 class LibraryViewModel(
-    private val videoRepository: com.example.octo.data.repository.VideoRepository,
+    private val videoRepository: VideoRepository,
     workManager: WorkManager,
+    private val bodyPartDao: BodyPartDao,
+    sessionDao: com.example.octo.data.local.SessionDao,
 ) : ViewModel() {
 
     /** Per-video live download progress, keyed by videoId. */
@@ -120,24 +141,67 @@ class LibraryViewModel(
     /** Selected body parts — multi-select with OR semantics (video matches ANY). */
     private val selectedParts = MutableStateFlow<Set<BodyPart>>(emptySet())
 
+    /** Active sort (NEWEST default) + direction — true = primary sort descending. */
+    private val sortMode = MutableStateFlow(LibrarySort.NEWEST)
+    private val sortDescending = MutableStateFlow(true)
+
     val query: StateFlow<String> = searchQuery.asStateFlow()
     val parts: StateFlow<Set<BodyPart>> = selectedParts.asStateFlow()
+    val sort: StateFlow<LibrarySort> = sortMode.asStateFlow()
+    val sortDesc: StateFlow<Boolean> = sortDescending.asStateFlow()
+
+    /** videoId → most recent session timestamp (null-ish absent = never played). */
+    private val lastPlayed: Flow<Map<String, Long>> =
+        sessionDao.lastPlayedPerVideo()
+            .combine(items) { rows, _ -> rows.associate { it.videoId to it.lastPlayedAt } }
+
+    /** Body parts already stretched TODAY (confirmed stretches only). */
+    private val partsDoneToday: Flow<Set<String>> = let {
+        val today = LocalDate.now().format(DateTimeFormatter.ISO_LOCAL_DATE)
+        bodyPartDao.forRange(today, today)
+            .combine(items) { rows, _ -> rows.map { it.bodyPartId }.toSet() }
+    }
+
 
     /**
-     * Filtered view of [items]: text filter AND part filter (OR within selected parts).
-     * Computed reactively over the existing Room flow — no new DAO needed.
+     * Filtered + sorted view of [items]: text filter AND part filter (OR within
+     * selected parts), then ordered by the active sort/direction.
      */
     val filteredItems: StateFlow<List<VideoUiItem>> =
-        combine(items, searchQuery, selectedParts) { rows, query, parts ->
+        combine(
+            combine(items, lastPlayed, partsDoneToday) { rows, played, doneToday ->
+                Triple(rows, played, doneToday)
+            },
+            searchQuery,
+            selectedParts,
+            combine(sortMode, sortDescending) { m, d -> m to d },
+        ) { (rows, played, doneToday), query, parts, (mode, desc) ->
             val q = query.trim()
-            rows.filter { item ->
+            val filtered = rows.filter { item ->
                 val textMatch = q.isEmpty() ||
                     item.video.title.contains(q, ignoreCase = true) ||
                     item.video.channel.contains(q, ignoreCase = true)
                 val partMatch = parts.isEmpty() || item.bodyParts.any { it in parts }
                 textMatch && partMatch
             }
+            val needScore = { item: VideoUiItem -> item.bodyParts.count { it.id !in doneToday } }
+            val primary = when (mode) {
+                LibrarySort.NEWEST -> compareBy<VideoUiItem> { it.video.addedAt }
+                LibrarySort.RECENTLY_DONE -> compareBy<VideoUiItem> { played[it.video.id] ?: 0L }
+                LibrarySort.MOST_NEEDED -> compareBy<VideoUiItem> { needScore(it) }
+            }
+            val directional = if (desc) primary.reversed() else primary
+            // Fixed tiebreak: newest additions first within equal primary keys.
+            filtered.sortedWith(directional.thenByDescending { it.video.addedAt })
         }.stateIn(viewModelScope, SharingStarted.WhileSubscribed(5_000), emptyList())
+
+    fun setSort(mode: LibrarySort) {
+        sortMode.value = mode
+    }
+
+    fun toggleSortDirection() {
+        sortDescending.value = !sortDescending.value
+    }
 
     fun setQuery(value: String) {
         searchQuery.value = value
@@ -201,6 +265,8 @@ class LibraryViewModel(
                 LibraryViewModel(
                     videoRepository = app.appContainer.videoRepository,
                     workManager = WorkManager.getInstance(app),
+                    bodyPartDao = app.appContainer.database.bodyPartDao(),
+                    sessionDao = app.appContainer.database.sessionDao(),
                 )
             }
         }

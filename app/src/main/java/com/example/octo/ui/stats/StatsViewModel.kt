@@ -11,6 +11,7 @@ import com.example.octo.data.local.BodyPartDao
 import com.example.octo.data.local.RangeTotalRow
 import com.example.octo.data.local.SessionDao
 import com.example.octo.data.local.SessionRangeTotalRow
+import com.example.octo.data.local.VideoBodyPartDao
 import java.time.LocalDate
 import java.time.ZoneId
 import java.time.format.DateTimeFormatter
@@ -33,6 +34,12 @@ data class PartStat(
     val series: List<Int>,
 )
 
+/** One row of the library coverage list: how many videos cover each body part. */
+data class LibraryPartStat(
+    val part: BodyPart,
+    val videoCount: Int,
+)
+
 data class StatsUiState(
     val range: StatsRange = StatsRange.D30,
     val loading: Boolean = true,
@@ -44,6 +51,8 @@ data class StatsUiState(
     val bestStreak: Int = 0,
     val buckets: List<TrendBucket> = emptyList(),
     val parts: List<PartStat> = emptyList(),
+    /** Library coverage per body part — independent of the selected range. */
+    val libraryParts: List<LibraryPartStat> = emptyList(),
     /** Sanity cross-check from the raw sessions table ("logged X min across Y sessions"). */
     val sanityMinutes: Int = 0,
     val sanitySessions: Int = 0,
@@ -69,6 +78,7 @@ private data class RawStats(
 class StatsViewModel(
     private val bodyPartDao: BodyPartDao,
     private val sessionDao: SessionDao,
+    videoBodyPartDao: VideoBodyPartDao,
 ) : ViewModel() {
 
     private val _range = MutableStateFlow(StatsRange.D30)
@@ -102,8 +112,9 @@ class StatsViewModel(
                 RawStats(totals, partRows, dailyRows, rawRows, activeDates)
             },
             sessionDao.rangeTotals(fromMillis, toMillis),
-        ) { raw, sanity ->
-            buildState(raw, r, today, sanity)
+            videoBodyPartDao.videoCountsByPart(),
+        ) { raw, sanity, libraryRows ->
+            buildState(raw, r, today, sanity, libraryRows)
         }
     }.stateIn(viewModelScope, SharingStarted.WhileSubscribed(5_000), StatsUiState())
 
@@ -116,6 +127,7 @@ class StatsViewModel(
         range: StatsRange,
         today: LocalDate,
         sanity: SessionRangeTotalRow?,
+        libraryRows: List<com.example.octo.data.local.PartVideoCountRow>,
     ): StatsUiState {
         val totals = raw.totals ?: RangeTotalRow(minutes = 0, sessions = 0, activeDays = 0)
         val minutesByDate = raw.dailyRows.associate { it.date to it.minutes }
@@ -162,7 +174,16 @@ class StatsViewModel(
             parts = parts,
             sanityMinutes = (sanity?.totalSeconds ?: 0) / 60,
             sanitySessions = sanity?.sessions ?: 0,
+            libraryParts = libraryStats(libraryRows),
         )
+    }
+
+    /** All 16 parts, scarcest first — the gaps you should go hunt videos for. */
+    private fun libraryStats(rows: List<com.example.octo.data.local.PartVideoCountRow>): List<LibraryPartStat> {
+        val countById = rows.associate { it.bodyPartId to it.videoCount }
+        return BodyPart.entries
+            .map { p -> LibraryPartStat(p, countById[p.id] ?: 0) }
+            .sortedWith(compareBy<LibraryPartStat> { it.videoCount }.thenBy { it.part.displayName })
     }
 
     private fun LocalDate.iso(): String = format(DateTimeFormatter.ISO_LOCAL_DATE)
@@ -177,6 +198,7 @@ class StatsViewModel(
                 StatsViewModel(
                     bodyPartDao = app.appContainer.database.bodyPartDao(),
                     sessionDao = app.appContainer.database.sessionDao(),
+                    videoBodyPartDao = app.appContainer.database.videoBodyPartDao(),
                 )
             }
         }

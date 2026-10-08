@@ -84,6 +84,7 @@ fun BodyPartDetailScreen(
     val state by viewModel.state.collectAsState()
 
     Scaffold(
+        containerColor = Color.Transparent,
         topBar = {
             TopAppBar(
                 title = { Text(state.part?.displayName ?: stringResource(R.string.part_detail_title_fallback)) },

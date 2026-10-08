@@ -5,6 +5,7 @@ import androidx.compose.foundation.layout.Arrangement
 import androidx.compose.foundation.layout.Column
 import androidx.compose.foundation.layout.Row
 import androidx.compose.foundation.layout.Spacer
+import androidx.compose.foundation.layout.WindowInsets
 import androidx.compose.foundation.layout.fillMaxSize
 import androidx.compose.foundation.layout.fillMaxWidth
 import androidx.compose.foundation.layout.height
@@ -18,8 +19,8 @@ import androidx.compose.foundation.rememberScrollState
 import androidx.compose.foundation.verticalScroll
 import androidx.compose.ui.graphics.Color
 import androidx.compose.material.icons.Icons
+import androidx.compose.material.icons.automirrored.filled.KeyboardArrowRight
 import androidx.compose.material.icons.filled.Check
-import androidx.compose.material.icons.filled.KeyboardArrowRight
 import androidx.compose.material.icons.filled.Search
 import androidx.compose.material.icons.filled.Visibility
 import androidx.compose.material.icons.filled.VisibilityOff
@@ -58,6 +59,7 @@ import androidx.lifecycle.viewmodel.compose.viewModel
 import com.example.octo.BuildConfig
 import com.example.octo.R
 import com.example.octo.data.settings.SettingsRepository
+import com.example.octo.ui.components.OctoHeader
 
 /**
  * Settings (Phase 5, picker reworked Phase 15): LLM endpoint form (base URL /
@@ -113,18 +115,24 @@ fun SettingsScreen(
         )
     }
 
-    Scaffold(
-        modifier = modifier,
-        topBar = { TopAppBar(title = { Text(stringResource(R.string.settings_title)) }) },
-    ) { padding ->
+    // contentWindowInsets=0: the root app scaffold already applies the system-bar
+    // insets — a second scaffold here would double-pad and push the header down.
+    Scaffold(modifier = modifier, containerColor = Color.Transparent, contentWindowInsets = WindowInsets(0)) { padding ->
         Column(
             modifier = Modifier
                 .fillMaxSize()
                 .padding(padding)
                 .verticalScroll(rememberScrollState())
-                .padding(16.dp),
+                // Header geometry must match Body/Stats: 8dp top (owned by
+                // OctoHeader itself), 12dp horizontal like the dashboard grid.
+                .padding(top = 0.dp, start = 12.dp, end = 12.dp, bottom = 16.dp),
             verticalArrangement = Arrangement.spacedBy(16.dp),
         ) {
+            // Shared mascot header — identical to Body/Stats/Library.
+            OctoHeader(
+                title = stringResource(R.string.settings_title),
+                subtitle = stringResource(R.string.settings_subtitle),
+            )
             // ── LLM section ──
             Card(modifier = Modifier.fillMaxWidth()) {
                 Column(
@@ -322,7 +330,7 @@ private fun TailHabitRow(
         )
         Spacer(Modifier.width(4.dp))
         Icon(
-            imageVector = Icons.Filled.KeyboardArrowRight,
+            imageVector = Icons.AutoMirrored.Filled.KeyboardArrowRight,
             contentDescription = stringResource(R.string.settings_tail_pick),
             tint = MaterialTheme.colorScheme.onSurfaceVariant,
         )

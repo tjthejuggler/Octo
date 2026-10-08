@@ -8,6 +8,7 @@
 
     <!-- Library screen -->
     <string name="library_title">Library</string>
+    <string name="library_subtitle">your stretch video collection</string>
     <string name="library_empty_title">Your library is empty</string>
     <string name="library_empty_body">Share a YouTube video from the YouTube app\u2019s share menu and pick Octo — it will appear here. You can also tap + to paste a link.</string>
     <string name="library_add_url">Add video URL</string>
@@ -35,6 +36,10 @@
     <string name="library_search_hint">Search title or channel</string>
     <string name="library_filter_clear">Clear</string>
     <string name="library_no_match">No videos match</string>
+    <!-- Library sorts: Newest / Recently done / Most needed (parts not stretched today) -->
+    <string name="library_sort_label">Sort</string>
+    <string name="library_sort_direction">Flip sort direction</string>
+    <string name="library_sort_hint_most_needed">Covers the most body parts you haven\u2019t stretched today</string>
 
     <!-- Player screen (Phase 4) -->
     <string name="player_back">Back</string>
@@ -62,6 +67,7 @@
 
     <!-- Settings screen (Phase 5) -->
     <string name="settings_title">Settings</string>
+    <string name="settings_subtitle">tune the octopus 🐙</string>
     <string name="settings_llm_section">LLM extraction</string>
     <string name="settings_llm_base_url">Base URL</string>
     <string name="settings_llm_api_key">API key</string>

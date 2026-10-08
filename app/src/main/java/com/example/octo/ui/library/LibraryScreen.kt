@@ -9,6 +9,7 @@ import androidx.compose.foundation.layout.Column
 import androidx.compose.foundation.layout.PaddingValues
 import androidx.compose.foundation.layout.Row
 import androidx.compose.foundation.layout.Spacer
+import androidx.compose.foundation.layout.WindowInsets
 import androidx.compose.foundation.layout.fillMaxSize
 import androidx.compose.foundation.layout.fillMaxWidth
 import androidx.compose.foundation.layout.height
@@ -53,8 +54,10 @@ import androidx.compose.runtime.setValue
 import androidx.compose.ui.Alignment
 import androidx.compose.ui.Modifier
 import androidx.compose.ui.draw.clip
+import androidx.compose.ui.graphics.Color
 import androidx.compose.ui.layout.ContentScale
 import androidx.compose.ui.res.stringResource
+import androidx.compose.ui.text.font.FontWeight
 import androidx.compose.ui.text.style.TextOverflow
 import androidx.compose.ui.unit.dp
 import androidx.lifecycle.viewmodel.compose.viewModel
@@ -62,6 +65,7 @@ import coil.compose.AsyncImage
 import com.example.octo.R
 import com.example.octo.data.local.BodyPart
 import com.example.octo.data.local.DownloadState
+import com.example.octo.ui.components.OctoHeader
 import com.example.octo.ui.components.TwoRowChips
 import java.io.File
 
@@ -86,6 +90,8 @@ fun LibraryScreen(
     val filtered by viewModel.filteredItems.collectAsState()
     val query by viewModel.query.collectAsState()
     val selectedParts by viewModel.parts.collectAsState()
+    val sort by viewModel.sort.collectAsState()
+    val sortDesc by viewModel.sortDesc.collectAsState()
     var showAddDialog by remember { mutableStateOf(false) }
     var deleteTarget by remember { mutableStateOf<LibraryViewModel.VideoUiItem?>(null) }
     var addError by remember { mutableStateOf<Boolean>(false) }
@@ -93,10 +99,11 @@ fun LibraryScreen(
     var analyzeConfirmTarget by remember { mutableStateOf<LibraryViewModel.VideoUiItem?>(null) }
     val filtersActive = query.isNotBlank() || selectedParts.isNotEmpty()
 
+    // contentWindowInsets=0: the root app scaffold already applies the system-bar
+    // insets — a second scaffold here would double-pad and push the header down.
     Scaffold(
-        topBar = {
-            TopAppBar(title = { Text(stringResource(R.string.library_title)) })
-        },
+        containerColor = Color.Transparent,
+        contentWindowInsets = WindowInsets(0),
         floatingActionButton = {
             FloatingActionButton(onClick = { showAddDialog = true; addError = false }) {
                 Icon(Icons.Filled.Add, contentDescription = stringResource(R.string.library_add_url))
@@ -106,9 +113,17 @@ fun LibraryScreen(
         Column(
             modifier = Modifier
                 .fillMaxSize()
-                .padding(padding),
+                .padding(padding)
+                // 12dp horizontal to match the Body dashboard's content grid; the
+                // shared OctoHeader then starts at the exact same x as Body's.
+                .padding(horizontal = 12.dp),
         ) {
-            // --- Search + body-part filter (Phase 21) ---
+            // Shared mascot header — identical to Body/Stats.
+            OctoHeader(
+                title = stringResource(R.string.library_title),
+                subtitle = stringResource(R.string.library_subtitle),
+            )
+            // --- Compressed header: search + (sort | part) chips ---
             if (items.isNotEmpty()) {
                 OutlinedTextField(
                     value = query,
@@ -130,9 +145,10 @@ fun LibraryScreen(
                     textStyle = MaterialTheme.typography.bodyMedium,
                     modifier = Modifier
                         .fillMaxWidth()
-                        .padding(horizontal = 16.dp, vertical = 4.dp),
+                        .padding(horizontal = 16.dp, vertical = 2.dp),
                 )
 
+                // ONE compact chip row: sorts first, then a divider chip, then parts.
                 Row(
                     verticalAlignment = Alignment.CenterVertically,
                     horizontalArrangement = Arrangement.spacedBy(6.dp),
@@ -141,6 +157,29 @@ fun LibraryScreen(
                         .horizontalScroll(rememberScrollState())
                         .padding(horizontal = 16.dp, vertical = 2.dp),
                 ) {
+                    LibrarySort.entries.forEach { mode ->
+                        FilterChip(
+                            selected = mode == sort,
+                            onClick = { viewModel.setSort(mode) },
+                            label = {
+                                Text(mode.label, style = MaterialTheme.typography.labelSmall)
+                            },
+                        )
+                    }
+                    FilterChip(
+                        selected = false,
+                        onClick = viewModel::toggleSortDirection,
+                        label = { Text(if (sortDesc) "↓" else "↑") },
+                    )
+
+                    // Visual separator between sorts and part filters.
+                    Box(
+                        modifier = Modifier
+                            .width(1.dp)
+                            .height(24.dp)
+                            .background(MaterialTheme.colorScheme.outlineVariant),
+                    )
+
                     if (selectedParts.isNotEmpty()) {
                         FilterChip(
                             selected = true,

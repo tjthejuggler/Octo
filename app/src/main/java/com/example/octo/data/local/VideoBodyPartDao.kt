@@ -30,6 +30,16 @@ interface VideoBodyPartDao {
         }
     }
 
+    /** Library coverage stats: how many videos are tagged per body part. */
+    @Query(
+        """
+        SELECT bodyPartId, COUNT(*) AS videoCount
+        FROM video_body_part_cross_ref
+        GROUP BY bodyPartId
+        """
+    )
+    fun videoCountsByPart(): Flow<List<PartVideoCountRow>>
+
     /** Phase 11: every library video tagged with [bodyPartId] (+ its other links), newest first. */
     @Transaction
     @Query(
