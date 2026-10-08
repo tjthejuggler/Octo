@@ -37,6 +37,8 @@
     <string name="library_filter_clear">Clear</string>
     <string name="library_no_match">No videos match</string>
     <!-- Library sorts: Newest / Recently done / Most needed (parts not stretched today) -->
+    <string name="library_filter_parts">Filter by body part</string>
+    <string name="library_filter_parts_title">Show videos stretching…</string>
     <string name="library_sort_label">Sort</string>
     <string name="library_sort_direction">Flip sort direction</string>
     <string name="library_sort_hint_most_needed">Covers the most body parts you haven\u2019t stretched today</string>

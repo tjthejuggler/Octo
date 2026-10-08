@@ -59,6 +59,7 @@ import androidx.lifecycle.viewmodel.compose.viewModel
 import com.example.octo.BuildConfig
 import com.example.octo.R
 import com.example.octo.data.settings.SettingsRepository
+import com.example.octo.ui.components.GlassCard
 import com.example.octo.ui.components.OctoHeader
 
 /**
@@ -134,7 +135,7 @@ fun SettingsScreen(
                 subtitle = stringResource(R.string.settings_subtitle),
             )
             // ── LLM section ──
-            Card(modifier = Modifier.fillMaxWidth()) {
+            GlassCard(modifier = Modifier.fillMaxWidth()) {
                 Column(
                     modifier = Modifier.padding(16.dp),
                     verticalArrangement = Arrangement.spacedBy(12.dp),
@@ -213,7 +214,7 @@ fun SettingsScreen(
             }
 
             // ── Tail section (Phase 15): compact row → searchable picker dialog ──
-            Card(modifier = Modifier.fillMaxWidth()) {
+            GlassCard(modifier = Modifier.fillMaxWidth()) {
                 Column(
                     modifier = Modifier.padding(vertical = 4.dp),
                 ) {
@@ -225,7 +226,7 @@ fun SettingsScreen(
             }
 
             // ── Library backup (Phase 8): SAF export/import of URL rows ──
-            Card(modifier = Modifier.fillMaxWidth()) {
+            GlassCard(modifier = Modifier.fillMaxWidth()) {
                 Column(
                     modifier = Modifier.padding(16.dp),
                     verticalArrangement = Arrangement.spacedBy(12.dp),

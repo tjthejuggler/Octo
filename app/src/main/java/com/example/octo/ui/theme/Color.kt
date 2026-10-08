@@ -6,8 +6,8 @@ import androidx.compose.ui.graphics.Color
 val Abyss = Color(0xFF081C22) // near-black sea, dark background
 val AbyssSurface = Color(0xFF0E2730)
 val AbyssVariant = Color(0xFF173440)
-val FoamDark = Color(0xFFD8E8E6) // text on dark
-val FoamMuted = Color(0xFF9FB8B5)
+val FoamDark = Color(0xFFE6F2F0) // text on dark — brightened for water backdrop
+val FoamMuted = Color(0xFFB7CDC9) // secondary text on dark — readable on water
 
 // ---- Light neutrals ----
 val Foam = Color(0xFFF7FBFA)

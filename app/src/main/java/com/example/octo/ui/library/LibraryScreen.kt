@@ -11,6 +11,7 @@ import androidx.compose.foundation.layout.Row
 import androidx.compose.foundation.layout.Spacer
 import androidx.compose.foundation.layout.WindowInsets
 import androidx.compose.foundation.layout.fillMaxSize
+import androidx.compose.foundation.layout.heightIn
 import androidx.compose.foundation.layout.fillMaxWidth
 import androidx.compose.foundation.layout.height
 import androidx.compose.foundation.layout.padding
@@ -20,11 +21,13 @@ import androidx.compose.foundation.lazy.LazyColumn
 import androidx.compose.foundation.lazy.items
 import androidx.compose.foundation.rememberScrollState
 import androidx.compose.foundation.shape.RoundedCornerShape
+import androidx.compose.foundation.verticalScroll
 import androidx.compose.material.icons.Icons
 import androidx.compose.material.icons.filled.Add
 import androidx.compose.material.icons.filled.CheckCircle
 import androidx.compose.material.icons.filled.Clear
 import androidx.compose.material.icons.filled.Delete
+import androidx.compose.material.icons.filled.FilterList
 import androidx.compose.material.icons.filled.MoreVert
 import androidx.compose.material.icons.filled.Refresh
 import androidx.compose.material.icons.filled.Search
@@ -65,6 +68,8 @@ import coil.compose.AsyncImage
 import com.example.octo.R
 import com.example.octo.data.local.BodyPart
 import com.example.octo.data.local.DownloadState
+import com.example.octo.ui.components.GlassCard
+import com.example.octo.ui.components.GlassTone
 import com.example.octo.ui.components.OctoHeader
 import com.example.octo.ui.components.TwoRowChips
 import java.io.File
@@ -123,8 +128,9 @@ fun LibraryScreen(
                 title = stringResource(R.string.library_title),
                 subtitle = stringResource(R.string.library_subtitle),
             )
-            // --- Compressed header: search + (sort | part) chips ---
+            // --- Compressed header: search (+ parts-filter popup) + (sort | part) chips ---
             if (items.isNotEmpty()) {
+                var partsFilterOpen by remember { mutableStateOf(false) }
                 OutlinedTextField(
                     value = query,
                     onValueChange = viewModel::setQuery,
@@ -132,11 +138,25 @@ fun LibraryScreen(
                     shape = RoundedCornerShape(20.dp),
                     leadingIcon = { Icon(Icons.Filled.Search, contentDescription = null) },
                     trailingIcon = {
-                        if (query.isNotEmpty()) {
-                            IconButton(onClick = { viewModel.setQuery("") }) {
+                        Row {
+                            if (query.isNotEmpty()) {
+                                IconButton(onClick = { viewModel.setQuery("") }) {
+                                    Icon(
+                                        Icons.Filled.Clear,
+                                        contentDescription = stringResource(R.string.library_filter_clear),
+                                    )
+                                }
+                            }
+                            // Body-part filter popup anchor — badge dot when active.
+                            IconButton(onClick = { partsFilterOpen = true }) {
                                 Icon(
-                                    Icons.Filled.Clear,
-                                    contentDescription = stringResource(R.string.library_filter_clear),
+                                    Icons.Filled.FilterList,
+                                    contentDescription = stringResource(R.string.library_filter_parts),
+                                    tint = if (selectedParts.isEmpty()) {
+                                        MaterialTheme.colorScheme.onSurfaceVariant
+                                    } else {
+                                        MaterialTheme.colorScheme.primary
+                                    },
                                 )
                             }
                         }
@@ -146,6 +166,14 @@ fun LibraryScreen(
                     modifier = Modifier
                         .fillMaxWidth()
                         .padding(horizontal = 16.dp, vertical = 2.dp),
+                )
+
+                PartsFilterPopup(
+                    expanded = partsFilterOpen,
+                    selected = selectedParts,
+                    onToggle = viewModel::togglePart,
+                    onClear = viewModel::clearFilters,
+                    onDismiss = { partsFilterOpen = false },
                 )
 
                 // ONE compact chip row: sorts first, then a divider chip, then parts.
@@ -302,6 +330,70 @@ fun LibraryScreen(
 }
 
 /**
+ * Body-part filter dialog, centered on screen in a glass pane matching the
+ * app's sea-glass language: scrollable check list of all 16 parts (multi-
+ * select, OR semantics) + Clear action. Drives the same
+ * [LibraryViewModel.togglePart] state as the chip row.
+ */
+@Composable
+private fun PartsFilterPopup(
+    expanded: Boolean,
+    selected: Set<BodyPart>,
+    onToggle: (BodyPart) -> Unit,
+    onClear: () -> Unit,
+    onDismiss: () -> Unit,
+) {
+    if (!expanded) return
+    AlertDialog(
+        onDismissRequest = onDismiss,
+        containerColor = Color.Transparent,
+        title = { Text(stringResource(R.string.library_filter_parts_title)) },
+        text = {
+            GlassCard(tone = GlassTone.Deep) {
+                Column(
+                    Modifier
+                        .heightIn(max = 430.dp)
+                        .verticalScroll(rememberScrollState()),
+                ) {
+                    if (selected.isNotEmpty()) {
+                        TextButton(onClick = onClear) {
+                            Icon(Icons.Filled.Clear, contentDescription = null)
+                            Spacer(Modifier.width(6.dp))
+                            Text(stringResource(R.string.library_filter_clear))
+                        }
+                    }
+                    BodyPart.entries.forEach { part ->
+                        Row(
+                            modifier = Modifier
+                                .fillMaxWidth()
+                                .clickable { onToggle(part) }
+                                .padding(horizontal = 16.dp, vertical = 8.dp),
+                            verticalAlignment = Alignment.CenterVertically,
+                        ) {
+                            Text(
+                                part.displayName,
+                                style = MaterialTheme.typography.bodyLarge,
+                                modifier = Modifier.weight(1f),
+                            )
+                            if (part in selected) {
+                                Icon(
+                                    Icons.Filled.CheckCircle,
+                                    contentDescription = null,
+                                    tint = MaterialTheme.colorScheme.primary,
+                                )
+                            }
+                        }
+                    }
+                }
+            }
+        },
+        confirmButton = {
+            TextButton(onClick = onDismiss) { Text(stringResource(R.string.library_cancel)) }
+        },
+    )
+}
+
+/**
  * Phase 21 compact card; FB26 rework: the whole card is a single click target
  * that opens the video-detail screen (no explicit play button). Part tags use
  * the shared two-row layout (row 1 fixed, row 2 scrollable, no "+n").
@@ -316,10 +408,11 @@ private fun VideoCard(
 ) {
     val video = item.video
     var menuOpen by remember { mutableStateOf(false) }
-    Card(
+    GlassCard(
         modifier = Modifier
             .fillMaxWidth()
             .clickable(onClick = onOpen),
+        shape = RoundedCornerShape(20.dp),
     ) {
         Row(
             modifier = Modifier.padding(8.dp),

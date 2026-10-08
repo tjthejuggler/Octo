@@ -54,6 +54,7 @@ import com.example.octo.ui.body.OctoBodyGreen
 import com.example.octo.ui.components.OctoHeader
 import com.example.octo.ui.body.OctoBodyTeal
 import com.example.octo.ui.body.octoRegionColor
+import com.example.octo.ui.components.GlassCard
 
 /**
  * Stats tab (Phase 7): range-selectable overview cards, per-body-part frequency bars
@@ -168,12 +169,7 @@ private fun OverviewCards(state: StatsUiState) {
 
 @Composable
 private fun StatCard(value: String, label: String, modifier: Modifier = Modifier, dimmed: Boolean = false) {
-    Card(
-        modifier = modifier,
-        colors = CardDefaults.cardColors(
-            containerColor = MaterialTheme.colorScheme.surfaceVariant.copy(alpha = 0.6f),
-        ),
-    ) {
+    GlassCard(modifier = modifier) {
         Column(
             modifier = Modifier
                 .fillMaxWidth()
@@ -202,12 +198,7 @@ private fun StatCard(value: String, label: String, modifier: Modifier = Modifier
  */
 @Composable
 private fun TrendCard(buckets: List<TrendBucket>, range: StatsRange) {
-    Card(
-        modifier = Modifier.fillMaxWidth(),
-        colors = CardDefaults.cardColors(
-            containerColor = MaterialTheme.colorScheme.surfaceVariant.copy(alpha = 0.4f),
-        ),
-    ) {
+    GlassCard(modifier = Modifier.fillMaxWidth()) {
         Column(Modifier.padding(12.dp)) {
             Text("Minutes over time", style = MaterialTheme.typography.titleMedium, fontWeight = FontWeight.SemiBold)
             Text(
@@ -424,13 +415,10 @@ private fun Sparkline(series: List<Int>, modifier: Modifier = Modifier) {
 /** Playful callout for parts with 0 minutes in the window — the stiff tentacles. */
 @Composable
 private fun NeglectedCallout(neglected: List<PartStat>, windowLabel: String) {
-    Card(
+    GlassCard(
         modifier = Modifier
             .fillMaxWidth()
             .padding(top = 10.dp),
-        colors = CardDefaults.cardColors(
-            containerColor = MaterialTheme.colorScheme.secondaryContainer.copy(alpha = 0.5f),
-        ),
     ) {
         Column(Modifier.padding(12.dp)) {
             Text(
@@ -463,12 +451,7 @@ private fun NeglectedCallout(neglected: List<PartStat>, windowLabel: String) {
 private fun LibraryCoverageCard(parts: List<LibraryPartStat>, loading: Boolean) {
     val missing = parts.filter { it.videoCount == 0 }
     val total = parts.sumOf { it.videoCount }
-    Card(
-        modifier = Modifier.fillMaxWidth(),
-        colors = CardDefaults.cardColors(
-            containerColor = MaterialTheme.colorScheme.surfaceVariant.copy(alpha = 0.4f),
-        ),
-    ) {
+    GlassCard(modifier = Modifier.fillMaxWidth()) {
         Column(Modifier.padding(12.dp)) {
             Text("Library coverage", style = MaterialTheme.typography.titleMedium, fontWeight = FontWeight.SemiBold)
             Text(
@@ -573,12 +556,7 @@ private fun SanityNote(minutes: Int, sessions: Int) {
 
 @Composable
 private fun EmptyStatsCard(modifier: Modifier = Modifier) {
-    Card(
-        modifier = modifier.fillMaxWidth(),
-        colors = CardDefaults.cardColors(
-            containerColor = MaterialTheme.colorScheme.secondaryContainer.copy(alpha = 0.5f),
-        ),
-    ) {
+    GlassCard(modifier = modifier.fillMaxWidth()) {
         Column(
             modifier = Modifier.fillMaxWidth().padding(20.dp),
             horizontalAlignment = Alignment.CenterHorizontally,
