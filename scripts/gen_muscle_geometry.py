@@ -174,18 +174,18 @@ def build_front():
     m = []
     m.append(("sternocleidomastoid", oval(474, 526, 16, 44, 24), "sand", True))
     # deltoids: two big gold ovals capping the shoulder
-    m.append(("lateral_deltoid", oval(388, 570, 40, 54, 30), "gold", True))
-    m.append(("anterior_deltoid", oval(416, 592, 36, 50, 14), "gold", True))
+    m.append(("lateral_deltoid", oval(386, 574, 44, 58, 30), "gold", True))
+    m.append(("anterior_deltoid", oval(414, 598, 40, 54, 14), "gold", True))
     # pecs: two big red ovals tiling the chest
-    m.append(("pectoralis_major", oval(438, 596, 62, 48, -6), "red", True))
-    m.append(("pectoralis_minor", oval(444, 552, 42, 30, -8), "red", True))
+    m.append(("pectoralis_major", oval(438, 610, 66, 58, -6), "red", True))
+    m.append(("pectoralis_minor", oval(446, 556, 44, 34, -8), "red", True))
     # biceps: one fat oval filling the upper-arm belly
-    m.append(("biceps_brachii", oval(346, 690, 34, 62, 14), "rust", True))
+    m.append(("biceps_brachii", oval(346, 690, 37, 66, 14), "rust", True))
     # forearm: two stacked orange ovals
-    m.append(("brachioradialis", oval(312, 866, 26, 52, 8), "orange", True))
-    m.append(("wrist_flexors", oval(330, 892, 24, 48, 8), "orange", True))
+    m.append(("brachioradialis", oval(312, 866, 29, 56, 8), "orange", True))
+    m.append(("wrist_flexors", oval(330, 892, 27, 52, 8), "orange", True))
     # abs: big green plate; obliques: tall side ovals
-    m.append(("rectus_abdominis", oval(500, 754, 58, 88, 0), "green", False))
+    m.append(("rectus_abdominis", oval(500, 760, 58, 98, 0), "green", False))
     m.append(("external_obliques", oval(442, 750, 30, 66, 6), "green", True))
     # hip flexors + TFL
     m.append(("hip_flexors", oval(474, 938, 24, 50, 8), "salmon", True))
