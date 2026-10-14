@@ -42,7 +42,8 @@ class SettingsRepository(private val dataStore: DataStore<Preferences>) {
         val storedBaseUrl = prefs[Keys.LLM_BASE_URL]
         val storedModel = prefs[Keys.LLM_MODEL]
 
-        val baseUrlNeedsMigration = storedBaseUrl == null || storedBaseUrl == LEGACY_LLM_BASE_URL
+        val baseUrlNeedsMigration =
+            storedBaseUrl == null || storedBaseUrl == LEGACY_LLM_BASE_URL || storedBaseUrl == LEGACY_LLM_BASE_URL_ZAI
         val modelNeedsMigration = storedModel == null || storedModel == LEGACY_LLM_MODEL
         if (!baseUrlNeedsMigration && !modelNeedsMigration) return
 
@@ -79,12 +80,18 @@ class SettingsRepository(private val dataStore: DataStore<Preferences>) {
     suspend fun runLegacyDefaultsMigration() = migrateLegacyDefaultsIfNeeded()
 
     companion object {
-        const val DEFAULT_LLM_BASE_URL = "https://api.z.ai/api/paas/v4"
+        // GLM Coding Plan subscription keys only work on the dedicated coding endpoint
+        // (docs.z.ai devpack): the standard /api/paas/v4 path returns
+        // HTTP 429 code 1113 "Insufficient balance" for coding-plan keys.
+        const val DEFAULT_LLM_BASE_URL = "https://api.z.ai/api/coding/paas/v4"
         const val DEFAULT_LLM_MODEL = "glm-4.6"
         const val DEFAULT_TAIL_HABIT_NAME = "Yoga & Stretch"
 
         /** Pre-Phase-15 defaults — migrated away from on first read (exact match only). */
         const val LEGACY_LLM_BASE_URL = "https://api.openai.com/v1"
+
+        /** Standard (non-coding) z.ai endpoint — migrated to the coding endpoint. */
+        const val LEGACY_LLM_BASE_URL_ZAI = "https://api.z.ai/api/paas/v4"
         const val LEGACY_LLM_MODEL = "gpt-4o-mini"
     }
 }

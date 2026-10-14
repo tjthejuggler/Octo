@@ -170,6 +170,8 @@
     <string name="part_source_heuristic">Quick scan</string>
     <string name="part_source_manual">Edited</string>
     <string name="video_detail_edit_parts">Edit parts</string>
+    <string name="video_detail_toggle_parts">Parts</string>
+    <string name="video_detail_toggle_muscles">Muscles</string>
     <string name="edit_parts_title">Body parts for this video</string>
     <string name="edit_parts_hint">Tick everything this video stretches — used for crediting sessions you log and coloring the octopus.</string>
     <string name="edit_parts_save">Save</string>

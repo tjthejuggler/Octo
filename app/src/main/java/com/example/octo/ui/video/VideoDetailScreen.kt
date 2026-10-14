@@ -36,6 +36,9 @@ import androidx.compose.material3.IconButton
 import androidx.compose.material3.MaterialTheme
 import androidx.compose.material3.OutlinedButton
 import androidx.compose.material3.Scaffold
+import androidx.compose.material3.SegmentedButton
+import androidx.compose.material3.SegmentedButtonDefaults
+import androidx.compose.material3.SingleChoiceSegmentedButtonRow
 import androidx.compose.material3.Surface
 import androidx.compose.material3.Text
 import androidx.compose.material3.TextButton
@@ -59,6 +62,7 @@ import androidx.lifecycle.viewmodel.compose.viewModel
 import coil.compose.AsyncImage
 import com.example.octo.R
 import com.example.octo.data.local.BodyPart
+import com.example.octo.data.local.Muscle
 import com.example.octo.data.local.DownloadState
 import com.example.octo.player.PlaybackResolution
 import com.example.octo.ui.body.OctoBodyAmber
@@ -185,7 +189,14 @@ fun VideoDetailScreen(
             // Shown whenever analysis finished — an EMPTY part set is a valid
             // DONE result (e.g. a meditation video) and must still be editable.
             if (state.isAnalysisDone) {
-                BodyPartChips(state, onOpenPart, onEditParts = { showEditParts = true })
+                var showMuscles by remember { mutableStateOf(false) }
+                TagsCard(
+                    state = state,
+                    showMuscles = showMuscles,
+                    onToggle = { showMuscles = it },
+                    onOpenPart = onOpenPart,
+                    onEditParts = { showEditParts = true },
+                )
             }
         }
     }
@@ -482,37 +493,94 @@ private fun LegendDot(color: androidx.compose.ui.graphics.Color, label: String) 
     }
 }
 
+/** Simple label from a muscle id-ish string ("pectoralis_major" -> "Pectoralis major"). */
+private fun muscleLabel(muscle: Muscle): String = muscle.displayName
+
+/**
+ * Tags card with a Parts / Muscles segmented toggle. Parts = the canonical
+ * 16 categories (tappable, editable via pencil); Muscles = the vision-layer
+ * detail, grouped implicitly by chip order. The toggle only appears when the
+ * video actually HAS muscle detail.
+ */
 @Composable
-private fun BodyPartChips(
+private fun TagsCard(
     state: VideoDetailUiState,
+    showMuscles: Boolean,
+    onToggle: (Boolean) -> Unit,
     onOpenPart: (String) -> Unit,
     onEditParts: () -> Unit,
 ) {
-    // FB25: no provenance chip (noise) — the pencil stays. FB26: TWO rows of
-    // tappable AssistChips (shared layout: row 1 fixed, row 2 scrolls, no "+n")
-    // at the bottom of the screen; the pencil sits below the rows.
     Column(modifier = Modifier.fillMaxWidth()) {
-        TwoRowChips(
-            items = state.bodyParts,
-            modifier = Modifier.fillMaxWidth(),
-            itemSpacing = 6.dp,
-            rowSpacing = 6.dp,
-        ) { part ->
-            AssistChip(
-                onClick = { onOpenPart(part.id) },
-                label = { Text(part.displayName, style = MaterialTheme.typography.labelSmall) },
-            )
+        // ── Parts / Muscles toggle (only when muscle detail exists) ──
+        if (state.muscles.isNotEmpty()) {
+            Row(
+                modifier = Modifier
+                    .fillMaxWidth()
+                    .padding(bottom = 6.dp),
+                horizontalArrangement = Arrangement.Center,
+            ) {
+                SingleChoiceSegmentedButtonRow {
+                    SegmentedButton(
+                        selected = !showMuscles,
+                        onClick = { onToggle(false) },
+                        shape = SegmentedButtonDefaults.itemShape(index = 0, count = 2),
+                    ) {
+                        Text(
+                            stringResource(R.string.video_detail_toggle_parts),
+                            style = MaterialTheme.typography.labelSmall,
+                        )
+                    }
+                    SegmentedButton(
+                        selected = showMuscles,
+                        onClick = { onToggle(true) },
+                        shape = SegmentedButtonDefaults.itemShape(index = 1, count = 2),
+                    ) {
+                        Text(
+                            stringResource(R.string.video_detail_toggle_muscles),
+                            style = MaterialTheme.typography.labelSmall,
+                        )
+                    }
+                }
+            }
         }
-        Row(
-            modifier = Modifier.fillMaxWidth(),
-            horizontalArrangement = Arrangement.End,
-        ) {
-            IconButton(onClick = onEditParts, modifier = Modifier.size(32.dp)) {
-                Icon(
-                    Icons.Filled.Edit,
-                    contentDescription = stringResource(R.string.video_detail_edit_parts),
-                    modifier = Modifier.size(18.dp),
+
+        if (showMuscles && state.muscles.isNotEmpty()) {
+            // ── Exact muscles (vision analysis) — wrapped chips, not tappable ──
+            TwoRowChips(
+                items = state.muscles,
+                modifier = Modifier.fillMaxWidth(),
+                itemSpacing = 6.dp,
+                rowSpacing = 6.dp,
+            ) { muscle ->
+                AssistChip(
+                    onClick = { onOpenPart(muscle.parent.id) },
+                    label = { Text(muscleLabel(muscle), style = MaterialTheme.typography.labelSmall) },
                 )
+            }
+        } else {
+            // ── Canonical 16-part categories (tappable, editable) ──
+            TwoRowChips(
+                items = state.bodyParts,
+                modifier = Modifier.fillMaxWidth(),
+                itemSpacing = 6.dp,
+                rowSpacing = 6.dp,
+            ) { part ->
+                AssistChip(
+                    onClick = { onOpenPart(part.id) },
+                    label = { Text(part.displayName, style = MaterialTheme.typography.labelSmall) },
+                )
+            }
+            Row(
+                modifier = Modifier.fillMaxWidth(),
+                horizontalArrangement = Arrangement.End,
+            ) {
+                IconButton(onClick = onEditParts, modifier = Modifier.size(32.dp)) {
+                    Icon(
+                        Icons.Filled.Edit,
+                        contentDescription = stringResource(R.string.video_detail_edit_parts),
+                        modifier = Modifier.size(18.dp),
+                    )
+                }
             }
         }
     }

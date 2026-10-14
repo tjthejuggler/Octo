@@ -37,6 +37,7 @@ class SettingsViewModel(
     /** App context for SAF stream access (export/import). */
     private val appContext: android.content.Context = application.applicationContext
 
+
     /** Result of the "Test LLM" round-trip. */
     sealed interface TestLlmState {
         data object Idle : TestLlmState
@@ -196,6 +197,7 @@ class SettingsViewModel(
     // ── Muscle layer: "Reanalyze library" ──
 
     private val _reanalyzeStatus = MutableStateFlow<String?>(null)
+    private var reanalyzeObserved = false
     /** One-line feedback for the reanalyze button ("queued" / error). */
     val reanalyzeStatus: StateFlow<String?> = _reanalyzeStatus.asStateFlow()
 
@@ -215,12 +217,48 @@ class SettingsViewModel(
             }
             val workManager = androidx.work.WorkManager.getInstance(appContext)
             val request = androidx.work.OneTimeWorkRequestBuilder<ReanalyzeLibraryWorker>().build()
+            // REPLACE (not KEEP): a previously failed/stuck chain under the same unique
+            // name must never silently swallow a fresh user request.
             workManager.enqueueUniqueWork(
                 ReanalyzeLibraryWorker.UNIQUE_NAME,
-                androidx.work.ExistingWorkPolicy.KEEP,
+                androidx.work.ExistingWorkPolicy.REPLACE,
                 request,
             )
             _reanalyzeStatus.value = STATUS_REANALYZE_QUEUED
+            observeReanalyzeWork()
+        }
+    }
+
+    /**
+     * Live status from WorkManager: reflects real worker progress ("analyzing 2/4"),
+     * and surfaces terminal outcomes so "queued" is never the last thing shown.
+     * Started on first user request — a fresh ViewModel must not resurrect a stale
+     * terminal state from a previous run.
+     */
+    private fun observeReanalyzeWork() {
+        if (reanalyzeObserved) return
+        reanalyzeObserved = true
+        viewModelScope.launch {
+            androidx.work.WorkManager.getInstance(appContext)
+                .getWorkInfosForUniqueWorkFlow(ReanalyzeLibraryWorker.UNIQUE_NAME)
+                .collect { infos ->
+                    val info = infos.firstOrNull() ?: return@collect
+                    when (info.state) {
+                        androidx.work.WorkInfo.State.ENQUEUED ->
+                            _reanalyzeStatus.value = STATUS_REANALYZE_QUEUED
+                        androidx.work.WorkInfo.State.RUNNING -> {
+                            val done = info.progress.getInt(ReanalyzeLibraryWorker.PROGRESS_DONE, -1)
+                            val total = info.progress.getInt(ReanalyzeLibraryWorker.PROGRESS_TOTAL, -1)
+                            _reanalyzeStatus.value =
+                                if (done >= 0 && total > 0) "analyzing $done/$total" else "analyzing…"
+                        }
+                        androidx.work.WorkInfo.State.FAILED ->
+                            _reanalyzeStatus.value = STATUS_REANALYZE_FAILED
+                        androidx.work.WorkInfo.State.SUCCEEDED ->
+                            _reanalyzeStatus.value = STATUS_REANALYZE_DONE
+                        else -> Unit
+                    }
+                }
         }
     }
 
@@ -263,6 +301,8 @@ class SettingsViewModel(
         const val STATUS_EXPORTED = "exported"
         const val STATUS_IMPORT_FORMAT = "imported:%d:%d"
         const val STATUS_REANALYZE_QUEUED = "queued"
+        const val STATUS_REANALYZE_DONE = "done"
+        const val STATUS_REANALYZE_FAILED = "failed — see logs (tag ReanalyzeLibraryWorker)"
         private const val TAG = "SettingsViewModel"
 
         /** Factory pattern consistent with [com.example.octo.ui.library.LibraryViewModel.Factory]. */

@@ -4,7 +4,7 @@ import android.content.Context
 import android.util.Log
 import androidx.work.CoroutineWorker
 import androidx.work.WorkerParameters
-import com.example.octo.llm.BodyPartAnalysisPipeline
+import com.example.octo.OctoApplication
 
 /**
  * "Reanalyze library" (Settings action): force re-runs the full analysis
@@ -13,13 +13,22 @@ import com.example.octo.llm.BodyPartAnalysisPipeline
  * so the app can be closed mid-run without corrupting state (each video's
  * replace is transactional; RUNNING markers keep re-entry safe).
  *
+ * Standard (Context, WorkerParameters) constructor pulling deps from
+ * [OctoApplication.appContainer] — identical to [DownloadVideoWorker], so the
+ * worker instantiates via BOTH OctoWorkerFactory and WorkManager's reflective
+ * fallback (a 3-arg constructor previously made the fallback fail with
+ * NoSuchMethodException and the work silently FAILED with 0 attempts).
+ *
  * Progress is reported as "done/total" via setProgress for the Settings UI.
  */
 class ReanalyzeLibraryWorker(
     appContext: Context,
     params: WorkerParameters,
-    private val pipeline: BodyPartAnalysisPipeline,
 ) : CoroutineWorker(appContext, params) {
+
+    private val pipeline
+        get() = (applicationContext.applicationContext as OctoApplication)
+            .appContainer.bodyPartAnalysisPipeline
 
     override suspend fun doWork(): Result {
         val videoIds = pipeline.allVideoIds()
@@ -30,7 +39,8 @@ class ReanalyzeLibraryWorker(
         videoIds.forEachIndexed { index, videoId ->
             // force = true: even DONE rows are redone so the muscle layer fills in.
             val outcome = pipeline.ensureAnalyzed(videoId, force = true)
-            if (outcome == BodyPartAnalysisPipeline.Outcome.ANALYZED) analyzed++
+            Log.i(TAG, "Reanalyze [$videoId] -> $outcome")
+            if (outcome == com.example.octo.llm.BodyPartAnalysisPipeline.Outcome.ANALYZED) analyzed++
             setProgress(
                 androidx.work.workDataOf(
                     PROGRESS_DONE to index + 1,

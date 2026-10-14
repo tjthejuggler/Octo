@@ -8,6 +8,7 @@ import androidx.lifecycle.viewmodel.viewModelFactory
 import com.example.octo.OctoApplication
 import com.example.octo.data.local.AnalysisState
 import com.example.octo.data.local.BodyPart
+import com.example.octo.data.local.Muscle
 import com.example.octo.data.local.PartSource
 import com.example.octo.data.local.BodyPartDao
 import com.example.octo.data.local.SessionDao
@@ -43,6 +44,8 @@ import kotlinx.coroutines.launch
 data class VideoDetailUiState(
     val video: VideoEntity? = null,
     val bodyParts: List<BodyPart> = emptyList(),
+    /** Exact muscles (vision layer) linked to this video — empty until analyzed. */
+    val muscles: List<Muscle> = emptyList(),
     val todayMinutes: Map<BodyPart, Int> = emptyMap(),
     val resolution: PlaybackResolution? = null,
     /** Phase 22: pending (played, unconfirmed) sessions for THIS video, newest first. */
@@ -93,6 +96,7 @@ class VideoDetailViewModel(
     private val playerManager: SessionPlayerManager,
     private val sessionRepository: SessionRepository,
     sessionDao: SessionDao,
+    videoMuscleDao: com.example.octo.data.local.VideoMuscleDao,
     private val settingsRepository: SettingsRepository,
     private val tailClient: TailIntegrationClient,
 ) : ViewModel() {
@@ -101,7 +105,8 @@ class VideoDetailViewModel(
         videoDao.observeWithBodyPartsById(videoId),
         bodyPartDao.forDay(LocalDate.now().iso()),
         sessionDao.pendingForVideo(videoId),
-    ) { row, dayRows, pending ->
+        videoMuscleDao.observeMuscleIdsForVideo(videoId),
+    ) { row, dayRows, pending, muscleIds ->
         val video = row?.video
         // Cross-ref links only count once analysis finished (empty DONE is valid).
         val parts = if (video?.analysisState == AnalysisState.DONE) {
@@ -112,6 +117,7 @@ class VideoDetailViewModel(
         VideoDetailUiState(
         video = video,
         bodyParts = parts,
+        muscles = muscleIds.mapNotNull(Muscle::fromId).sortedBy { it.ordinal },
         todayMinutes = dayRows.mapNotNull { r ->
             BodyPart.fromId(r.bodyPartId)?.takeIf { r.minutes > 0 }?.to(r.minutes)
         }.toMap(),
@@ -185,6 +191,7 @@ class VideoDetailViewModel(
                     playerManager = container.sessionPlayerManager,
                     sessionRepository = container.sessionRepository,
                     sessionDao = container.database.sessionDao(),
+                    videoMuscleDao = container.database.videoMuscleDao(),
                     settingsRepository = container.settingsRepository,
                     tailClient = TailIntegrationClient(app),
                 )

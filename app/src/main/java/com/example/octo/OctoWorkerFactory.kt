@@ -22,7 +22,7 @@ class OctoWorkerFactory(private val container: OctoApplication.AppContainer) : W
             DownloadVideoWorker(appContext, workerParameters)
 
         ReanalyzeLibraryWorker::class.java.name ->
-            ReanalyzeLibraryWorker(appContext, workerParameters, container.bodyPartAnalysisPipeline)
+            ReanalyzeLibraryWorker(appContext, workerParameters)
 
         else -> null // fall back to default reflective instantiation
     }

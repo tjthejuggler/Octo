@@ -53,7 +53,9 @@ class BodyPartAnalysisPipeline(
             if (!force && row.analysisState == AnalysisState.DONE) {
                 return@withContext Outcome.ALREADY_DONE
             }
-            if (row.analysisState == AnalysisState.RUNNING) {
+            // force=true (Reanalyze library) pushes through a stale RUNNING marker left
+            // by a process-killed run; only opportunistic triggers respect the lock.
+            if (!force && row.analysisState == AnalysisState.RUNNING) {
                 return@withContext Outcome.SKIPPED_RUNNING
             }
 
