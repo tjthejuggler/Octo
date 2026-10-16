@@ -1039,23 +1039,17 @@ private fun FlippableBodyView(
             },
         contentAlignment = Alignment.Center,
     ) {
-        if (muscleMode) {
-            MuscleFigureView(
-                stretchedMuscles = stretchedMuscles,
-                side = if (side == OctopusBodyGeometry.Side.BACK) {
-                    MuscleBodyGeometry.Side.BACK
-                } else {
-                    MuscleBodyGeometry.Side.FRONT
-                },
-                onMuscleTap = onMuscleTap,
-            )
-        } else {
-            OctopusBodyView(
-                stretchedMinutes = stretchedMinutes,
-                onRegionTap = onRegionTap,
-                side = side,
-            )
-        }
+        // FB27: the SAME octopus body renders in both modes — muscle mode
+        // dulls it under a scrim and composites the exact-muscle plates on
+        // top (the standalone écorché figure is retired).
+        OctopusBodyView(
+            stretchedMinutes = stretchedMinutes,
+            onRegionTap = onRegionTap,
+            side = side,
+            muscleMode = muscleMode,
+            stretchedMuscles = stretchedMuscles,
+            onMuscleTap = onMuscleTap,
+        )
     }
 }
 

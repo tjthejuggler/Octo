@@ -1,32 +1,36 @@
-# ADR: Anatomical muscle figure (écorché) as the dashboard's "Muscles" view
+# ADR: Muscle view renders as an overlay on the octopus body (FB27)
 
 ## Status
-Accepted (2026-10-08)
+Accepted (2026-10-14; arm-plate rotation sign corrected on-device)
 
 ## Context
-The body dashboard's octopus-man has 16 tappable regions. The muscle-detail
-layer (48 canonical muscles, vision-LLM analyzed) needed a figure-level view:
-when the user toggles "Muscles", the whole centerpiece becomes an anatomical
-human diagram, front + back, with the mascot head preserved.
+The dashboard's Muscles toggle previously swapped the octopus-man figure for a
+standalone poster-écorché anatomical figure. The user preferred the octopus
+body art and wanted the same body visible in muscle mode — just dulled so the
+muscle layer reads.
 
 ## Decision
-1. Geometry is GENERATED: scripts/gen_muscle_geometry.py emits
-   ui/body/MuscleBodyGeometry.kt (silhouette + per-muscle band paths in the
-   same 1000x1500 viewBox as OctopusBodyGeometry). Never hand-edit numbers.
-2. Every muscle is a full-width BAND/plate of its limb segment (écorché
-   tiling) — floating ellipses ("slivers") were rejected after on-device
-   review. Deep/no-surface muscles are intentionally absent from the figure.
-3. Rendering (MuscleFigureView) is two-pass: (1) each band inflated ~5% in a
-   flat base tone with dark contour so neighbors merge into one continuous
-   anatomy mass; (2) normal-size gradient detail pass; stretched-today
-   muscles glow teal. Everything is clipped to the silhouette union so no
-   band can ever overflow the body.
-4. The SAME PPQ octopus head art (and placement constants, made internal) is
-   composited over the neck dome in both modes — the mascot is continuous.
-5. Toggle state (muscleMode) is shared by the figure pill AND the parts
-   sheet's Parts/Muscles segment; the octopus man remains the default.
+- OctopusBodyView gained muscleMode/stretchedMuscles/onMuscleTap params. In
+  muscle mode it draws the normal body, then a dark scrim (DullScrim,
+  0xFF10161F @ 55%) clipped to the figure silhouette (regions + finger
+  tentacles), then composites the muscle plates from MuscleBodyGeometry on top
+  (both share the 1000x1500 viewBox so plates align with the octo-man). The PPQ
+  head art draws AFTER the scrim so the face stays bright.
+- Tap routing: muscle plates win first (inscribed-ellipse spindleHit), then
+  body-part regions fall through.
+- MuscleBodyView.kt (MuscleFigureView) was deleted; its palette moved into
+  OctopusBodyView.kt (muscleHueShades).
+- Arm plates regenerated as rotated ellipse spindles aligned to the octopus
+  tentacle-arm axis: shoulder cap x260-404/y470-590, upper arm
+  (383,548)->(299,728), forearm (298,734)->(264,892). CRITICAL SIGN NOTE: the
+  arms SPLAY OUTWARD going down, so plate rotation is POSITIVE (+24/+25/+12°)
+  — top end INWARD (toward x=500), bottom end OUTWARD. A negative rotation
+  (tried first) leans the plates the wrong way; verified via adb screencap.
 
 ## Consequences
-- Art changes go through the Python script, then regenerate + rebuild.
-- The silhouette clip makes band-position regressions safe by construction.
-- Front/back reuse the existing flip machinery (side enum mapped across).
+- One figure, two looks: no duplicate body art; the écorché silhouette is gone.
+- MuscleBodyGeometry remains the plate data source; arm plate coordinates are
+  octopus-arm-calibrated (positive splay rotation) — keep the sign if
+  gen_muscle_geometry.py is ever re-run.
+- Plates render under the translucent hair-tentacle art (consistent with the
+  body itself), which slightly washes them near the shoulders.
