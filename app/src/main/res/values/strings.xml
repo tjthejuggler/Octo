@@ -104,8 +104,6 @@
     <string name="video_detail_missing_files">No local video to play yet. Download it first.</string>
     <string name="video_detail_retry_download">Retry download</string>
     <string name="video_detail_analyzing">Analyzing…</string>
-    <string name="video_detail_legend_today">Already today</string>
-    <string name="video_detail_legend_video">This video</string>
     <string name="video_detail_unknown">Unknown video 🐙</string>
 
     <!-- Body-part detail screen (Phase 11; strings added Phase 13) -->

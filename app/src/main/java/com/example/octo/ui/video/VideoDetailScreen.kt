@@ -65,10 +65,8 @@ import com.example.octo.data.local.BodyPart
 import com.example.octo.data.local.Muscle
 import com.example.octo.data.local.DownloadState
 import com.example.octo.player.PlaybackResolution
-import com.example.octo.ui.body.OctoBodyAmber
 import com.example.octo.ui.body.OctopusBodyGeometry
 import com.example.octo.ui.body.OctopusBodyView
-import com.example.octo.ui.body.octoRegionColor
 import com.example.octo.ui.components.TwoRowChips
 import java.io.File
 
@@ -103,6 +101,9 @@ fun VideoDetailScreen(
     var showDiscardConfirm by remember { mutableStateOf<Long?>(null) }
     // Phase 24: "Edit parts" dialog visibility.
     var showEditParts by remember { mutableStateOf(false) }
+    // Phase 28: Parts / Muscles toggle — shared by the tag chips AND the two
+    // mini octopus-men (muscle mode renders the muscle plates on them too).
+    var showMuscles by remember { mutableStateOf(false) }
 
     // Dual-player safety: leaving this screen (back OR Maximize→player) disposes
     // the composable and releases the mini ExoPlayer — the full player then
@@ -179,9 +180,11 @@ fun VideoDetailScreen(
                 onRetryDownload = viewModel::retryDownload,
             )
 
-            // ── Mini octopus-man: today (green) vs this video (amber) ──
+            // ── Mini octopus-men: preview of the dashboard tier colors; the
+            // TagsCard Parts/Muscles toggle also swaps these to muscle plates ──
             MiniBodyMapCard(
                 state = state,
+                showMuscles = showMuscles,
                 onOpenPart = onOpenPart,
             )
 
@@ -189,7 +192,6 @@ fun VideoDetailScreen(
             // Shown whenever analysis finished — an EMPTY part set is a valid
             // DONE result (e.g. a meditation video) and must still be editable.
             if (state.isAnalysisDone) {
-                var showMuscles by remember { mutableStateOf(false) }
                 TagsCard(
                     state = state,
                     showMuscles = showMuscles,
@@ -422,6 +424,7 @@ private fun PosterCard(
 @Composable
 private fun MiniBodyMapCard(
     state: VideoDetailUiState,
+    showMuscles: Boolean,
     onOpenPart: (String) -> Unit,
 ) {
     Card(modifier = Modifier.fillMaxWidth()) {
@@ -431,20 +434,14 @@ private fun MiniBodyMapCard(
                 .padding(12.dp),
             horizontalAlignment = Alignment.CenterHorizontally,
         ) {
-            // Legend: today (green) vs this video (amber).
-            Row(
-                verticalAlignment = Alignment.CenterVertically,
-                horizontalArrangement = Arrangement.spacedBy(16.dp),
-            ) {
-                LegendDot(octoRegionColor(FULL_LEGEND_MINUTES), stringResource(R.string.video_detail_legend_today))
-                LegendDot(OctoBodyAmber, stringResource(R.string.video_detail_legend_video))
-            }
             Spacer(Modifier.height(4.dp))
             // FB26: front AND back figures in a FIXED-HEIGHT row drawn via the
             // fitInside letterbox mode — min(w,h) scale, centered in each half,
             // identical size, never clipped (FB25 pixel-scan showed the old
             // aspect-ratio cells overflowing the card bottom and reading
             // different sizes). 180.dp keeps the whole screen no-scroll.
+            // Phase 28: previewMode colors — covered parts render tier(count+1),
+            // everything else idle red; muscle mode composites the plates.
             Row(
                 modifier = Modifier
                     .fillMaxWidth()
@@ -453,19 +450,25 @@ private fun MiniBodyMapCard(
                 verticalAlignment = Alignment.CenterVertically,
             ) {
                 OctopusBodyView(
-                    stretchedMinutes = state.todayMinutes,
+                    todayCounts = state.todayCounts,
                     onRegionTap = { part -> onOpenPart(part.id) },
-                    videoTargets = state.videoTargets,
+                    previewMode = true,
+                    previewTargets = state.videoTargets,
+                    previewMuscles = state.videoMuscles,
                     side = OctopusBodyGeometry.Side.FRONT,
                     fitInside = true,
+                    muscleMode = showMuscles,
                     modifier = Modifier.weight(1f).fillMaxSize(),
                 )
                 OctopusBodyView(
-                    stretchedMinutes = state.todayMinutes,
+                    todayCounts = state.todayCounts,
                     onRegionTap = { part -> onOpenPart(part.id) },
-                    videoTargets = state.videoTargets,
+                    previewMode = true,
+                    previewTargets = state.videoTargets,
+                    previewMuscles = state.videoMuscles,
                     side = OctopusBodyGeometry.Side.BACK,
                     fitInside = true,
+                    muscleMode = showMuscles,
                     modifier = Modifier.weight(1f).fillMaxSize(),
                 )
             }
@@ -473,25 +476,6 @@ private fun MiniBodyMapCard(
     }
 }
 
-private const val FULL_LEGEND_MINUTES = 10
-
-@Composable
-private fun LegendDot(color: androidx.compose.ui.graphics.Color, label: String) {
-    Row(verticalAlignment = Alignment.CenterVertically) {
-        Box(
-            modifier = Modifier
-                .size(10.dp)
-                .clip(CircleShape)
-                .background(color),
-        )
-        Spacer(Modifier.width(6.dp))
-        Text(
-            text = label,
-            style = MaterialTheme.typography.labelSmall,
-            color = MaterialTheme.colorScheme.onSurfaceVariant,
-        )
-    }
-}
 
 /** Simple label from a muscle id-ish string ("pectoralis_major" -> "Pectoralis major"). */
 private fun muscleLabel(muscle: Muscle): String = muscle.displayName

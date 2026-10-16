@@ -97,6 +97,8 @@ class BodyViewModel(
         val selectedDate: LocalDate = LocalDate.now(),
         val isToday: Boolean = true,
         val minutesByPart: Map<BodyPart, Int> = emptyMap(),
+        /** Sessions (sets) logged today per part — drives the body-map tier colors. */
+        val countsByPart: Map<BodyPart, Int> = emptyMap(),
         val totalMinutes: Int = 0,
         val sessions: Int = 0,
         val percent: Int = 0,
@@ -108,10 +110,14 @@ class BodyViewModel(
             val minutesByPart: Map<BodyPart, Int> = rows
                 .mapNotNull { row -> BodyPart.fromId(row.bodyPartId)?.to(row.minutes) }
                 .toMap()
+            val countsByPart: Map<BodyPart, Int> = rows
+                .mapNotNull { row -> BodyPart.fromId(row.bodyPartId)?.to(row.sessions) }
+                .toMap()
             Dashboard(
                 selectedDate = date,
                 isToday = date == LocalDate.now(),
                 minutesByPart = minutesByPart,
+                countsByPart = countsByPart,
                 totalMinutes = rows.sumOf { it.minutes },
                 sessions = rows.sumOf { it.sessions },
                 percent = ((minutesByPart.size * 100.0) / BodyPart.entries.size).toInt(),

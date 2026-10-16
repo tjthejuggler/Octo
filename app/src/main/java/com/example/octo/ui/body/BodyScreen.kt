@@ -233,7 +233,7 @@ fun BodyScreen(
                 // pill below stays as a tap-to-toggle.
                 val degPerPx = degreesPerPx()
                 FlippableBodyView(
-                    stretchedMinutes = dashboard.minutesByPart,
+                    todayCounts = dashboard.countsByPart,
                     onRegionTap = onOpenPart,
                     muscleMode = muscleMode,
                     stretchedMuscles = musclesByPart.values.flatten().toSet(),
@@ -295,6 +295,7 @@ fun BodyScreen(
 
     if (showPartsSheet) {
         PartsSheet(
+            countsByPart = dashboard.countsByPart,
             minutesByPart = dashboard.minutesByPart,
             musclesByPart = musclesByPart,
             muscleMode = muscleMode,
@@ -621,14 +622,28 @@ private fun PercentRing(percent: Int, modifier: Modifier = Modifier) {
         animationSpec = tween(durationMillis = 900),
         label = "ringSweep",
     )
-    val ringColor = if (percent > 0) OctoBodyTeal else MaterialTheme.colorScheme.surfaceVariant
+    // Phase 31: the ring cycles the SAME tier colors as the body map — totally
+    // red at 0%, then morphing red→orange→green→blue→pink→yellow→white as the
+    // sweep grows; everything beyond the current sweep stays the track red.
+    val ringStops = remember {
+        listOf(
+            0f to BodyTierIdleRed,
+            1f / 7 to BodyTierOrange,
+            2f / 7 to BodyTierGreen,
+            3f / 7 to BodyTierBlue,
+            4f / 7 to BodyTierPink,
+            5f / 7 to BodyTierYellow,
+            6f / 7 to BodyTierWhite,
+            1f to BodyTierWhite,
+        )
+    }
     Canvas(modifier = modifier.semantics {
-        contentDescription = "$percent percent of body stretched"
+        contentDescription = "$percent percent of body trained"
     }) {
         val stroke = 8.dp.toPx()
         val inset = stroke / 2 + 2.dp.toPx()
         drawArc(
-            color = ringColor.copy(alpha = 0.25f),
+            color = BodyTierIdleRed.copy(alpha = 0.25f),
             startAngle = -90f,
             sweepAngle = 360f,
             useCenter = false,
@@ -636,8 +651,15 @@ private fun PercentRing(percent: Int, modifier: Modifier = Modifier) {
             topLeft = Offset(inset, inset),
             size = Size(size.width - inset * 2, size.height - inset * 2),
         )
+        // sweepGradient starts at 3 o'clock; rotate stops +25% so tier red
+        // begins at the arc's 12 o'clock start.
+        val center = Offset(size.width / 2f, size.height / 2f)
+        val brush = Brush.sweepGradient(
+            *ringStops.map { (f, c) -> (f + 0.25f) % 1f to c }.toTypedArray(),
+            center = center,
+        )
         drawArc(
-            brush = Brush.sweepGradient(listOf(OctoBodyTeal, OctoBodyGreen)),
+            brush = brush,
             startAngle = -90f,
             sweepAngle = 360f * sweep,
             useCenter = false,
@@ -729,12 +751,13 @@ private fun CornerStat(
 
 /**
  * Phase 14: the 16 body parts in a light Material3 bottom sheet, each with its
- * current state color dot (same [octoRegionColor] mapping as the figure).
+ * current state color dot (same [todayTierColor] mapping as the figure).
  * Tap → dismiss + navigate to "part/{bodyPartId}"; backdrop tap dismisses.
  */
 @OptIn(ExperimentalMaterial3Api::class)
 @Composable
 private fun PartsSheet(
+    countsByPart: Map<BodyPart, Int>,
     minutesByPart: Map<BodyPart, Int>,
     musclesByPart: Map<BodyPart, List<Muscle>>,
     muscleMode: Boolean,
@@ -773,7 +796,7 @@ private fun PartsSheet(
                     onPartTap = onPartTap,
                 )
             } else {
-                PartsList(minutesByPart = minutesByPart, onPartTap = onPartTap)
+                PartsList(countsByPart = countsByPart, minutesByPart = minutesByPart, onPartTap = onPartTap)
             }
         }
     }
@@ -812,6 +835,7 @@ private fun PartsMusclesToggle(showMuscles: Boolean, onToggle: () -> Unit) {
 /** The original 16-part grid, extracted from the sheet body. */
 @Composable
 private fun PartsList(
+    countsByPart: Map<BodyPart, Int>,
     minutesByPart: Map<BodyPart, Int>,
     onPartTap: (BodyPart) -> Unit,
 ) {
@@ -823,6 +847,7 @@ private fun PartsList(
                     for (part in rowParts) {
                         PartRow(
                             part = part,
+                            count = countsByPart[part] ?: 0,
                             minutes = minutesByPart[part] ?: 0,
                             onTap = { onPartTap(part) },
                             modifier = Modifier.weight(1f),
@@ -892,11 +917,12 @@ private fun MuscleList(
 @Composable
 private fun PartRow(
     part: BodyPart,
+    count: Int,
     minutes: Int,
     onTap: () -> Unit,
     modifier: Modifier = Modifier,
 ) {
-    val stretched = minutes > 0
+    val stretched = minutes > 0 || count > 0
     Row(
         modifier = modifier
             .clip(RoundedCornerShape(10.dp))
@@ -908,13 +934,7 @@ private fun PartRow(
             modifier = Modifier
                 .size(12.dp)
                 .clip(CircleShape)
-                .background(
-                    if (stretched) {
-                        octoRegionColor(minutes)
-                    } else {
-                        MaterialTheme.colorScheme.surfaceVariant
-                    },
-                ),
+                .background(todayTierColor(count)),
         )
         Spacer(Modifier.width(8.dp))
         Text(
@@ -995,7 +1015,7 @@ private const val FLICK_BIAS_SECONDS = 0.12f
  */
 @Composable
 private fun FlippableBodyView(
-    stretchedMinutes: Map<BodyPart, Int>,
+    todayCounts: Map<BodyPart, Int>,
     onRegionTap: (BodyPart) -> Unit,
     flipAngle: Float,
     side: OctopusBodyGeometry.Side,
@@ -1043,7 +1063,7 @@ private fun FlippableBodyView(
         // dulls it under a scrim and composites the exact-muscle plates on
         // top (the standalone écorché figure is retired).
         OctopusBodyView(
-            stretchedMinutes = stretchedMinutes,
+            todayCounts = todayCounts,
             onRegionTap = onRegionTap,
             side = side,
             muscleMode = muscleMode,

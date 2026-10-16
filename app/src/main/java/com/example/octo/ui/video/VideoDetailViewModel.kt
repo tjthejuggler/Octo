@@ -38,7 +38,7 @@ import kotlinx.coroutines.launch
  * @property video the library row (live; null while loading / unknown id).
  * @property bodyParts parts this video stretches — only populated once the Phase 5
  *  pipeline reached [AnalysisState.DONE] (cross-ref rows are only meaningful then).
- * @property todayMinutes today's per-part stretch minutes (same source as the dashboard).
+ * @property todayCounts today's per-part session counts (same source as the dashboard).
  * @property resolution local playback resolution; null until computed.
  */
 data class VideoDetailUiState(
@@ -46,7 +46,8 @@ data class VideoDetailUiState(
     val bodyParts: List<BodyPart> = emptyList(),
     /** Exact muscles (vision layer) linked to this video — empty until analyzed. */
     val muscles: List<Muscle> = emptyList(),
-    val todayMinutes: Map<BodyPart, Int> = emptyMap(),
+    /** Sessions (sets) logged today per part — feeds the mini-map tier colors. */
+    val todayCounts: Map<BodyPart, Int> = emptyMap(),
     val resolution: PlaybackResolution? = null,
     /** Phase 22: pending (played, unconfirmed) sessions for THIS video, newest first. */
     val pendingSessions: List<SessionWithTitle> = emptyList(),
@@ -71,13 +72,17 @@ data class VideoDetailUiState(
     val manualEdited: Boolean
         get() = video?.partSource == PartSource.MANUAL
 
-    /** Amber target set = parts this video stretches that are NOT yet stretched today. */
+    /**
+     * Mini-map preview set = parts this video stretches. In preview mode they
+     * render tier(count + 1) — the dashboard color they WILL get once this
+     * video is logged; every other part stays idle red.
+     */
     val videoTargets: Set<BodyPart>
-        get() = if (isAnalysisDone) {
-            bodyParts.filter { (todayMinutes[it] ?: 0) <= 0 }.toSet()
-        } else {
-            emptySet()
-        }
+        get() = if (isAnalysisDone) bodyParts.toSet() else emptySet()
+
+    /** Muscles covered by this video — mirrors [videoTargets] on the muscle layer. */
+    val videoMuscles: Set<Muscle>
+        get() = if (isAnalysisDone) muscles.toSet() else emptySet()
 }
 
 /**
@@ -118,8 +123,8 @@ class VideoDetailViewModel(
         video = video,
         bodyParts = parts,
         muscles = muscleIds.mapNotNull(Muscle::fromId).sortedBy { it.ordinal },
-        todayMinutes = dayRows.mapNotNull { r ->
-            BodyPart.fromId(r.bodyPartId)?.takeIf { r.minutes > 0 }?.to(r.minutes)
+        todayCounts = dayRows.mapNotNull { r ->
+            BodyPart.fromId(r.bodyPartId)?.takeIf { r.sessions > 0 }?.to(r.sessions)
         }.toMap(),
         resolution = video?.let(playerManager::resolve),
         pendingSessions = pending,
