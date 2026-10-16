@@ -52,6 +52,37 @@ object StatsMath {
     const val SPARKLINE_POINTS = 30
 
     /**
+     * Base tier boundary: 10 minutes per week takes a bar from orange into green.
+     * Fixed windows scale it up (30D = 4×, 90D = 12×); ALL derives it from the
+     * data span.
+     */
+    const val TIER_STEP_MINUTES_PER_WEEK = 10
+
+    /** Color segments above idle: orange→green→blue→pink→yellow→white. */
+    const val USAGE_TIERS = 6
+
+    /**
+     * Minutes occupied by ONE color tier on the stats frequency bars — the
+     * window-scaled absolute yardstick used for BOTH bar length and bar color
+     * (full bar / white = [USAGE_TIERS] × this). 7D → 10 (the per-week base),
+     * 30D → 40 (4×), 90D → 120 (3× more); ALL is derived from the data span at
+     * [TIER_STEP_MINUTES_PER_WEEK] per week, so it grows as history accumulates.
+     * [spanDays] is only read for [StatsRange.ALL].
+     */
+    fun tierStepMinutes(range: StatsRange, spanDays: Int): Int = when (range) {
+        StatsRange.D7 -> TIER_STEP_MINUTES_PER_WEEK
+        StatsRange.D30 -> 4 * TIER_STEP_MINUTES_PER_WEEK
+        StatsRange.D90 -> 12 * TIER_STEP_MINUTES_PER_WEEK
+        StatsRange.ALL ->
+            (spanDays.coerceAtLeast(7) * TIER_STEP_MINUTES_PER_WEEK + 6) / 7 // ceil(10/7 × days)
+    }
+
+    /** Bar/color fraction for [minutes] against a window's [tierStepMinutes]. */
+    fun usageFraction(minutes: Int, tierStepMinutes: Int): Float =
+        if (tierStepMinutes <= 0) 0f
+        else (minutes.toFloat() / (tierStepMinutes * USAGE_TIERS)).coerceIn(0f, 1f)
+
+    /**
      * Streak = consecutive active days. [Streaks.current] tolerates "today not yet
      * stretched" (counts from yesterday instead) — same semantics as the dashboard
      * streak in BodyViewModel.
@@ -151,10 +182,15 @@ object StatsMath {
     private fun datesIn(start: LocalDate, end: LocalDate): List<LocalDate> =
         generateSequence(start) { it.plusDays(1) }.takeWhile { !it.isAfter(end) }.toList()
 
+    /**
+     * Axis label for a bucket: bare day-of-month number for the daily windows
+     * (7D/30D — no month, per feedback), "MMM d" for 90D weeks, month names for
+     * ALL (year-qualified across year boundaries).
+     */
     private fun bucketLabel(bucketStart: LocalDate, today: LocalDate, range: StatsRange): String =
         when (range) {
             StatsRange.D7, StatsRange.D30 ->
-                bucketStart.format(DateTimeFormatter.ofPattern("M/d"))
+                bucketStart.dayOfMonth.toString()
             StatsRange.D90 ->
                 bucketStart.format(DateTimeFormatter.ofPattern("MMM d", Locale.ENGLISH))
             StatsRange.ALL ->

@@ -1,5 +1,9 @@
 package com.example.octo.ui.stats
 
+import android.app.Activity
+import android.content.Context
+import android.content.ContextWrapper
+import android.content.pm.ActivityInfo
 import androidx.compose.animation.AnimatedVisibility
 import androidx.compose.foundation.Canvas
 import androidx.compose.foundation.Image
@@ -27,10 +31,12 @@ import androidx.compose.material3.FilterChip
 import androidx.compose.material3.MaterialTheme
 import androidx.compose.material3.Text
 import androidx.compose.runtime.Composable
+import androidx.compose.runtime.DisposableEffect
 import androidx.compose.runtime.collectAsState
 import androidx.compose.runtime.getValue
 import androidx.compose.runtime.mutableStateOf
 import androidx.compose.runtime.remember
+import androidx.compose.runtime.saveable.rememberSaveable
 import androidx.compose.runtime.setValue
 import androidx.compose.ui.Alignment
 import androidx.compose.ui.Modifier
@@ -42,11 +48,14 @@ import androidx.compose.ui.graphics.Color
 import androidx.compose.ui.graphics.Path
 import androidx.compose.ui.graphics.drawscope.Stroke
 import androidx.compose.ui.layout.ContentScale
+import androidx.compose.ui.platform.LocalContext
 import androidx.compose.ui.res.painterResource
 import androidx.compose.ui.text.font.FontWeight
 import androidx.compose.ui.text.style.TextAlign
 import androidx.compose.ui.text.style.TextOverflow
 import androidx.compose.ui.unit.dp
+import androidx.compose.ui.window.Dialog
+import androidx.compose.ui.window.DialogProperties
 import androidx.lifecycle.viewmodel.compose.viewModel
 import com.example.octo.R
 import com.example.octo.data.local.BodyPart
@@ -56,6 +65,7 @@ import com.example.octo.ui.body.OctoBodyTeal
 import com.example.octo.ui.body.octoRegionColor
 import com.example.octo.ui.body.usageTierColor
 import com.example.octo.ui.components.GlassCard
+import java.util.Locale
 
 /**
  * Stats tab (Phase 7): range-selectable overview cards, per-body-part frequency bars
@@ -100,7 +110,7 @@ fun StatsScreen(
                 TrendCard(buckets = state.buckets, range = state.range)
                 Spacer(Modifier.height(12.dp))
                 FrequencyList(
-                    parts = state.parts,
+                    state = state,
                     windowLabel = state.range.label,
                     expandedPart = expandedPart,
                     onToggle = { p -> expandedPart = if (expandedPart == p) null else p },
@@ -193,28 +203,132 @@ private fun StatCard(value: String, label: String, modifier: Modifier = Modifier
 }
 
 /**
- * Canvas bar chart — one bar per [TrendBucket]: daily for 7D/30D, weekly for 90D,
- * monthly for ALL. Today's bucket is green; the purple overlay is the 7-day rolling
- * average (bucket-averaged for weekly/monthly buckets).
+ * "Minutes over time" card — tappable to open the [TrendChartDialog] landscape
+ * full-screen view. The inline card shows a y-axis (minute values up the left)
+ * and compact x labels (bare day numbers for 7D/30D, ~6 shown for 30D; week
+ * dates for 90D; month names for ALL).
  */
 @Composable
 private fun TrendCard(buckets: List<TrendBucket>, range: StatsRange) {
+    var expanded by rememberSaveable { mutableStateOf(false) }
     GlassCard(modifier = Modifier.fillMaxWidth()) {
-        Column(Modifier.padding(12.dp)) {
+        Column(
+            Modifier
+                .padding(12.dp)
+                .clickable { expanded = true },
+        ) {
             Text("Minutes over time", style = MaterialTheme.typography.titleMedium, fontWeight = FontWeight.SemiBold)
             Text(
                 when (range) {
-                    StatsRange.D7, StatsRange.D30 -> "per day · line = 7-day average"
-                    StatsRange.D90 -> "per week · line = average of daily 7-day means"
-                    StatsRange.ALL -> "per month · line = average of daily 7-day means"
+                    StatsRange.D7, StatsRange.D30 -> "per day · line = 7-day average · tap to expand"
+                    StatsRange.D90 -> "per week · line = average of daily 7-day means · tap to expand"
+                    StatsRange.ALL -> "per month · line = average of daily 7-day means · tap to expand"
                 },
                 style = MaterialTheme.typography.bodySmall,
                 color = MaterialTheme.colorScheme.onSurfaceVariant,
             )
             Spacer(Modifier.height(8.dp))
-            TrendChart(buckets = buckets, modifier = Modifier.fillMaxWidth().height(150.dp))
+            Row {
+                YAxisLabels(buckets = buckets, modifier = Modifier.height(150.dp).width(30.dp))
+                TrendChart(buckets = buckets, modifier = Modifier.fillMaxWidth().height(150.dp))
+            }
             Spacer(Modifier.height(4.dp))
-            BucketLabels(buckets)
+            Row {
+                Spacer(Modifier.width(30.dp))
+                BucketLabels(buckets, maxLabels = 6, modifier = Modifier.weight(1f))
+            }
+        }
+    }
+    if (expanded) {
+        TrendChartDialog(buckets = buckets, range = range, onDismiss = { expanded = false })
+    }
+}
+
+/**
+ * Landscape full-screen chart: every bucket gets an x label (day numbers for
+ * 7D/30D, month names for ALL) with a bigger canvas and the same y-axis.
+ */
+@Composable
+private fun TrendChartDialog(
+    buckets: List<TrendBucket>,
+    range: StatsRange,
+    onDismiss: () -> Unit,
+) {
+    val context = LocalContext.current
+    DisposableEffect(Unit) {
+        val activity = context.findActivity()
+        val prev = activity?.requestedOrientation
+        activity?.requestedOrientation = ActivityInfo.SCREEN_ORIENTATION_SENSOR_LANDSCAPE
+        onDispose {
+            if (prev != null) activity.requestedOrientation = prev
+        }
+    }
+    Dialog(
+        onDismissRequest = onDismiss,
+        properties = DialogProperties(usePlatformDefaultWidth = false),
+    ) {
+        Column(
+            modifier = Modifier
+                .fillMaxSize()
+                .clickable(onClick = onDismiss)
+                .padding(20.dp),
+            verticalArrangement = Arrangement.Center,
+        ) {
+            Text("Minutes over time", style = MaterialTheme.typography.titleMedium, fontWeight = FontWeight.SemiBold)
+            Text(
+                when (range) {
+                    StatsRange.D7, StatsRange.D30 -> "per day · line = 7-day average · tap anywhere to close"
+                    StatsRange.D90 -> "per week · line = average of daily 7-day means · tap anywhere to close"
+                    StatsRange.ALL -> "per month · line = average of daily 7-day means · tap anywhere to close"
+                },
+                style = MaterialTheme.typography.bodySmall,
+                color = MaterialTheme.colorScheme.onSurfaceVariant,
+            )
+            Spacer(Modifier.height(12.dp))
+            Row {
+                YAxisLabels(buckets = buckets, modifier = Modifier.height(260.dp).width(34.dp))
+                TrendChart(buckets = buckets, modifier = Modifier.fillMaxWidth().height(260.dp))
+            }
+            Spacer(Modifier.height(4.dp))
+            // Landscape has room: show EVERY bucket label (day numbers / month names).
+            Row {
+                Spacer(Modifier.width(34.dp))
+                BucketLabels(buckets, maxLabels = buckets.size, modifier = Modifier.weight(1f))
+            }
+        }
+    }
+}
+
+/** Locks the host activity to landscape while this chart composable is up. */
+private fun Context.findActivity(): Activity? {
+    var ctx = this
+    while (ctx is ContextWrapper) {
+        if (ctx is Activity) return ctx
+        ctx = ctx.baseContext
+    }
+    return null
+}
+
+/**
+ * Minute values up the left side of the chart — 4 grid-aligned ticks
+ * (max, ~2/3, ~1/3, 0) with a unit suffix on the top tick.
+ */
+@Composable
+private fun YAxisLabels(buckets: List<TrendBucket>, modifier: Modifier = Modifier) {
+    val maxVal = buckets.maxOfOrNull { it.minutes }?.coerceAtLeast(1) ?: 1
+    val ticks = listOf(maxVal, maxVal * 2 / 3, maxVal / 3, 0)
+    Column(
+        modifier = modifier,
+        verticalArrangement = Arrangement.SpaceBetween,
+        horizontalAlignment = Alignment.End,
+    ) {
+        ticks.forEachIndexed { i, t ->
+            Text(
+                text = if (i == 0) "$t m" else "$t",
+                style = MaterialTheme.typography.labelSmall,
+                color = MaterialTheme.colorScheme.onSurfaceVariant,
+                maxLines = 1,
+            )
         }
     }
 }
@@ -258,10 +372,19 @@ private fun TrendChart(buckets: List<TrendBucket>, modifier: Modifier = Modifier
     }
 }
 
+/**
+ * X-axis labels under the chart. Portrait shows at most [maxLabels] evenly
+ * spaced ones (30 daily buckets are too cramped for all); the landscape dialog
+ * passes every bucket so each day/month gets its own number.
+ */
 @Composable
-private fun BucketLabels(buckets: List<TrendBucket>) {
-    val showEvery = ((buckets.size + 5) / 6).coerceAtLeast(1) // ~6 labels max
-    Row(Modifier.fillMaxWidth()) {
+private fun BucketLabels(
+    buckets: List<TrendBucket>,
+    maxLabels: Int,
+    modifier: Modifier = Modifier,
+) {
+    val showEvery = if (buckets.size <= maxLabels) 1 else ((buckets.size + maxLabels - 1) / maxLabels)
+    Row(modifier = modifier.fillMaxWidth()) {
         buckets.forEachIndexed { i, b ->
             Text(
                 text = if (i % showEvery == 0 || i == buckets.lastIndex) b.label else "",
@@ -277,20 +400,21 @@ private fun BucketLabels(buckets: List<TrendBucket>) {
 }
 
 /**
- * All 16 parts: minutes + sessions in the window, bar length scaled to the max;
- * bar COLOR is also usage-based ([usageTierColor] of minutes/max-minutes), so
- * switching the window (7D ↔ 30D ↔ 90D ↔ ALL) recolors every bar whenever the
- * usage percentages shift — the week's favorite part glows green there but can
- * fade to orange in the 90-day view. Slate when 0. Tap a row to expand its
- * 30-point sparkline.
+ * All 16 parts: minutes + sessions in the window. Bar LENGTH and COLOR both use
+ * the window's ABSOLUTE minute scale ([state.tierStepMinutes]): 10 min per tier
+ * step in the week view (orange→green at 10), 40 in the month view (orange→green
+ * at 40, green→blue at 80), 120 in 90D, span-derived for ALL. A full white bar
+ * = 6 tier steps; bars no longer race to the top just for being the window's
+ * busiest part. Tap a row to expand its 30-point sparkline.
  */
 @Composable
 private fun FrequencyList(
-    parts: List<PartStat>,
+    state: StatsUiState,
     windowLabel: String,
     expandedPart: BodyPart?,
     onToggle: (BodyPart) -> Unit,
 ) {
+    val parts = state.parts
     val neglected = parts.filter { it.minutes == 0 }
     Column(verticalArrangement = Arrangement.spacedBy(2.dp)) {
         Text(
@@ -299,11 +423,10 @@ private fun FrequencyList(
             fontWeight = FontWeight.SemiBold,
             modifier = Modifier.padding(bottom = 2.dp),
         )
-        val maxMinutes = parts.maxOfOrNull { it.minutes } ?: 0
         parts.forEach { p ->
             PartRow(
                 stat = p,
-                fraction = if (maxMinutes == 0) 0f else p.minutes.toFloat() / maxMinutes,
+                fraction = StatsMath.usageFraction(p.minutes, state.tierStepMinutes),
                 expanded = expandedPart == p.part,
                 onToggle = { onToggle(p.part) },
             )

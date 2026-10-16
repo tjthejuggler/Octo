@@ -143,4 +143,52 @@ class StatsMathTest {
     fun `bucketing an empty series is empty`() {
         assertTrue(StatsMath.bucketDaily(emptyList(), today, StatsRange.D30).isEmpty())
     }
+
+    // ── Window minute scale (bar length + tier color yardstick) ──
+
+    @Test
+    fun `tier step is 10 minutes per week`() {
+        assertEquals(10, StatsMath.tierStepMinutes(StatsRange.D7, spanDays = 0))
+    }
+
+    @Test
+    fun `tier step scales 4x for a month and 3x more for 90 days`() {
+        assertEquals(40, StatsMath.tierStepMinutes(StatsRange.D30, spanDays = 0))
+        assertEquals(120, StatsMath.tierStepMinutes(StatsRange.D90, spanDays = 0))
+    }
+
+    @Test
+    fun `tier step for ALL derives from data span at 10 minutes per week`() {
+        assertEquals(10, StatsMath.tierStepMinutes(StatsRange.ALL, spanDays = 7))
+        // 30 days → ceil(10 × 30 / 7) = ceil(42.86) = 43
+        assertEquals(43, StatsMath.tierStepMinutes(StatsRange.ALL, spanDays = 30))
+        assertEquals(143, StatsMath.tierStepMinutes(StatsRange.ALL, spanDays = 100))
+    }
+
+    @Test
+    fun `tier step for ALL never collapses on tiny spans`() {
+        assertTrue(StatsMath.tierStepMinutes(StatsRange.ALL, spanDays = 0) >= 10)
+    }
+
+    @Test
+    fun `usage fraction hits tier boundaries at 10 minutes per week`() {
+        val step = 10
+        // Full white bar = 6 tiers = 60 minutes.
+        assertEquals(1f, StatsMath.usageFraction(60, step))
+        assertEquals(1f, StatsMath.usageFraction(600, step))
+        // Boundaries: 10 → 1/6 (orange→green), 20 → 2/6 (green→blue), …
+        assertEquals(1f / 6, StatsMath.usageFraction(10, step), 1e-6f)
+        assertEquals(2f / 6, StatsMath.usageFraction(20, step), 1e-6f)
+        assertEquals(3f / 6, StatsMath.usageFraction(30, step), 1e-6f)
+        // 16 minutes sits between orange and green — mid-fade, NOT white.
+        assertEquals(16f / 60, StatsMath.usageFraction(16, step), 1e-6f)
+        // Halfway through a tier is halfway through that color segment.
+        assertEquals(0.5f / 6, StatsMath.usageFraction(5, step), 1e-6f)
+    }
+
+    @Test
+    fun `usage fraction caps and floors`() {
+        assertEquals(0f, StatsMath.usageFraction(0, 10))
+        assertEquals(0f, StatsMath.usageFraction(5, 0)) // degenerate scale
+    }
 }

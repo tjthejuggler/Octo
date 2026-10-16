@@ -50,6 +50,12 @@ data class StatsUiState(
     val currentStreak: Int = 0,
     val bestStreak: Int = 0,
     val buckets: List<TrendBucket> = emptyList(),
+    /**
+     * Window-scaled minutes per color tier on the frequency bars — 10 for 7D,
+     * 40 for 30D, 120 for 90D, span-derived for ALL. Drives bar LENGTH and
+     * COLOR ([StatsMath.usageFraction]); recomputed on every range switch.
+     */
+    val tierStepMinutes: Int = StatsMath.TIER_STEP_MINUTES_PER_WEEK,
     val parts: List<PartStat> = emptyList(),
     /** Library coverage per body part — independent of the selected range. */
     val libraryParts: List<LibraryPartStat> = emptyList(),
@@ -161,6 +167,8 @@ class StatsViewModel(
                 compareByDescending<PartStat> { it.minutes }.thenByDescending { it.sessions },
             )
 
+        // Span of the data window in days — feeds the ALL-time tier scale.
+        val spanDays = dailySeries.size
         return StatsUiState(
             range = range,
             loading = false,
@@ -171,6 +179,7 @@ class StatsViewModel(
             currentStreak = streaks.current,
             bestStreak = streaks.best,
             buckets = buckets,
+            tierStepMinutes = StatsMath.tierStepMinutes(range, spanDays),
             parts = parts,
             sanityMinutes = (sanity?.totalSeconds ?: 0) / 60,
             sanitySessions = sanity?.sessions ?: 0,
