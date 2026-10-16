@@ -54,6 +54,7 @@ import com.example.octo.ui.body.OctoBodyGreen
 import com.example.octo.ui.components.OctoHeader
 import com.example.octo.ui.body.OctoBodyTeal
 import com.example.octo.ui.body.octoRegionColor
+import com.example.octo.ui.body.usageTierColor
 import com.example.octo.ui.components.GlassCard
 
 /**
@@ -277,8 +278,11 @@ private fun BucketLabels(buckets: List<TrendBucket>) {
 
 /**
  * All 16 parts: minutes + sessions in the window, bar length scaled to the max;
- * teal/green when ≥1 minute (dashboard region colors), slate when 0. Tap a row to
- * expand its 30-point sparkline.
+ * bar COLOR is also usage-based ([usageTierColor] of minutes/max-minutes), so
+ * switching the window (7D ↔ 30D ↔ 90D ↔ ALL) recolors every bar whenever the
+ * usage percentages shift — the week's favorite part glows green there but can
+ * fade to orange in the 90-day view. Slate when 0. Tap a row to expand its
+ * 30-point sparkline.
  */
 @Composable
 private fun FrequencyList(
@@ -348,7 +352,7 @@ private fun PartRow(
                         modifier = Modifier
                             .fillMaxWidth(fraction)
                             .fillMaxHeight()
-                            .background(octoRegionColor(stat.minutes)),
+                            .background(usageTierColor(fraction)),
                     )
                 }
             }

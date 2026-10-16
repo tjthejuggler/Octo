@@ -622,19 +622,26 @@ private fun PercentRing(percent: Int, modifier: Modifier = Modifier) {
         animationSpec = tween(durationMillis = 900),
         label = "ringSweep",
     )
-    // Phase 31: the ring cycles the SAME tier colors as the body map — totally
-    // red at 0%, then morphing red→orange→green→blue→pink→yellow→white as the
-    // sweep grows; everything beyond the current sweep stays the track red.
+    // Phase 32: a true CLOCK-FACE color wheel anchored to the arc's 12 o'clock
+    // start — orange at the top, fading clockwise through the tier sequence:
+    // green by ~2-3 o'clock, blue across 5-6, pink ~7-8, yellow ~9-10, white
+    // from ~11 — and the tail of the white fades smoothly back into orange
+    // right at 12. Every transition is a gradient stop; no hard edges anywhere.
+    // Stops are CLOCK fractions (0 = 12 o'clock, clockwise).
     val ringStops = remember {
         listOf(
-            0f to BodyTierIdleRed,
-            1f / 7 to BodyTierOrange,
-            2f / 7 to BodyTierGreen,
-            3f / 7 to BodyTierBlue,
-            4f / 7 to BodyTierPink,
-            5f / 7 to BodyTierYellow,
-            6f / 7 to BodyTierWhite,
-            1f to BodyTierWhite,
+            0.00f to BodyTierOrange,
+            0.10f to BodyTierOrange,   // hold the start orange past the badge
+            0.17f to BodyTierGreen,    // ~2 o'clock
+            0.29f to BodyTierGreen,    // ~3:30
+            0.38f to BodyTierBlue,     // ~4:35
+            0.50f to BodyTierBlue,     // ~6 o'clock
+            0.58f to BodyTierPink,     // ~7 o'clock
+            0.67f to BodyTierPink,     // ~8 o'clock
+            0.75f to BodyTierYellow,   // ~9 o'clock
+            0.83f to BodyTierYellow,   // ~10 o'clock
+            0.92f to BodyTierWhite,    // ~11 o'clock
+            1.00f to BodyTierOrange,   // white → orange wrap fade, ends at 12
         )
     }
     Canvas(modifier = modifier.semantics {
@@ -651,11 +658,17 @@ private fun PercentRing(percent: Int, modifier: Modifier = Modifier) {
             topLeft = Offset(inset, inset),
             size = Size(size.width - inset * 2, size.height - inset * 2),
         )
-        // sweepGradient starts at 3 o'clock; rotate stops +25% so tier red
-        // begins at the arc's 12 o'clock start.
+        // Sweep gradients start at 3 o'clock sweeping clockwise, so clock
+        // fractions are rotated +75% into shader space (12 o'clock → 0.75) and
+        // then RE-SORTED — the old `% 1f`-only rotation left the stops unsorted,
+        // which is what made the wheel render wrong. The wheel is continuous
+        // across the seam (orange on both sides), so sorting is exact.
         val center = Offset(size.width / 2f, size.height / 2f)
         val brush = Brush.sweepGradient(
-            *ringStops.map { (f, c) -> (f + 0.25f) % 1f to c }.toTypedArray(),
+            *ringStops.map { (t, c) -> (t + 0.75f) % 1f to c }
+                .sortedBy { (f, _) -> f }
+                .distinctBy { (f, _) -> f }
+                .toTypedArray(),
             center = center,
         )
         drawArc(

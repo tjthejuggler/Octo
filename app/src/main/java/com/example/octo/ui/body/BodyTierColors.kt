@@ -1,6 +1,7 @@
 package com.example.octo.ui.body
 
 import androidx.compose.ui.graphics.Color
+import androidx.compose.ui.graphics.lerp
 
 /**
  * Session-count color scale for the body map (dashboard + video-detail preview).
@@ -32,3 +33,34 @@ fun todayTierColor(count: Int): Color = when {
     count == 5 -> BodyTierYellow
     else -> BodyTierWhite
 }
+
+/**
+ * Continuous usage-intensity scale for the stats-screen bars — percentage-based,
+ * unlike the daily set-count scale above.
+ *
+ * [fraction] is a body part's usage RELATIVE to the busiest part in the SELECTED
+ * window (minutes / max-minutes, 0..1). Because it is recomputed per window,
+ * switching 7D ↔ 30D ↔ 90D recolors the bars whenever the usage percentages
+ * shift — a part dominating this week reads high-color in the week view and
+ * drops toward orange/red in the 90-day view if it was rarely done there.
+ *
+ * 0 → idle red; everything above rides the SAME tier sequence as the daily
+ * scale (orange → green → blue → pink → yellow → white), smoothly interpolated
+ * so "more usage = higher color" with no hard steps between tiers.
+ */
+fun usageTierColor(fraction: Float): Color {
+    if (fraction <= 0f) return BodyTierIdleRed
+    val scaled = fraction.coerceIn(0f, 1f) * UsagePalette.lastIndex
+    val i = scaled.toInt().coerceAtMost(UsagePalette.lastIndex - 1)
+    return lerp(UsagePalette[i], UsagePalette[i + 1], scaled - i)
+}
+
+/** Tier ramp for [usageTierColor] — the daily tier colors reused in order. */
+private val UsagePalette = listOf(
+    BodyTierOrange,
+    BodyTierGreen,
+    BodyTierBlue,
+    BodyTierPink,
+    BodyTierYellow,
+    BodyTierWhite,
+)
