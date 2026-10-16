@@ -4,8 +4,7 @@ import android.app.Activity
 import android.view.WindowManager
 import androidx.activity.compose.BackHandler
 import androidx.compose.foundation.background
-import androidx.compose.foundation.clickable
-import androidx.compose.foundation.interaction.MutableInteractionSource
+import androidx.compose.foundation.gestures.detectTapGestures
 import androidx.compose.foundation.layout.Arrangement
 import androidx.compose.foundation.layout.Box
 import androidx.compose.foundation.layout.Column
@@ -16,12 +15,15 @@ import androidx.compose.foundation.layout.fillMaxWidth
 import androidx.compose.foundation.layout.height
 import androidx.compose.foundation.layout.padding
 import androidx.compose.foundation.layout.width
+import androidx.compose.foundation.shape.CircleShape
 import androidx.compose.material.icons.Icons
 import androidx.compose.material.icons.automirrored.filled.ArrowBack
 import androidx.compose.material.icons.filled.AspectRatio
+import androidx.compose.material.icons.filled.Forward10
 import androidx.compose.material.icons.filled.FullscreenExit
 import androidx.compose.material.icons.filled.Pause
 import androidx.compose.material.icons.filled.PlayArrow
+import androidx.compose.material.icons.filled.Replay10
 import androidx.compose.ui.text.style.TextAlign
 import androidx.compose.material3.AlertDialog
 import androidx.compose.material3.Button
@@ -47,6 +49,7 @@ import androidx.compose.runtime.setValue
 import androidx.compose.ui.Alignment
 import androidx.compose.ui.Modifier
 import androidx.compose.ui.graphics.Color
+import androidx.compose.ui.input.pointer.pointerInput
 import androidx.compose.ui.platform.LocalContext
 import androidx.compose.ui.res.stringResource
 import androidx.compose.ui.text.style.TextOverflow
@@ -275,6 +278,9 @@ fun PlayerScreen(
     }
 }
 
+/** FB27: which half a double tap landed on — seek back (left) or forward (right). */
+private enum class SeekDirection { Back, Forward }
+
 /**
  * Phase 21: edge-to-edge portrait viewport. PlayerView fills the whole screen
  * (RESIZE_MODE_ZOOM crops a 16:9 video to fill; FIT letterboxes). The stock
@@ -293,6 +299,8 @@ private fun FullscreenPlayerSurface(
     onBack: () -> Unit,
     onExitDialog: () -> Unit,
 ) {
+    // FB27: transient double-tap seek badge (auto-hides via LaunchedEffect below).
+    var seekDirection by remember { mutableStateOf<SeekDirection?>(null) }
     Box(
         modifier = Modifier
             .fillMaxSize()
@@ -315,11 +323,24 @@ private fun FullscreenPlayerSurface(
             onRelease = { view -> view.player = null },
             modifier = Modifier
                 .fillMaxSize()
-                .clickable(
-                    interactionSource = remember { MutableInteractionSource() },
-                    indication = null,
-                    onClick = onTapSurface,
-                ),
+                .pointerInput(Unit) {
+                    // FB27: YouTube-style taps — single = play/pause + controls reveal
+                    // (delayed ~300 ms to disambiguate from a double tap), double =
+                    // seek ±10 s from the tapped half (left back / right forward).
+                    detectTapGestures(
+                        onTap = { onTapSurface() },
+                        onDoubleTap = { offset ->
+                            val forward = offset.x > size.width / 2f
+                            viewModel.seekBy(if (forward) 10_000L else -10_000L)
+                            viewModel.refreshPosition()
+                            seekDirection = if (forward) {
+                                SeekDirection.Forward
+                            } else {
+                                SeekDirection.Back
+                            }
+                        },
+                    )
+                },
         )
 
         // FB26: live position for the seek bar (~2 Hz; ExoPlayer has no position flow).
@@ -327,6 +348,14 @@ private fun FullscreenPlayerSurface(
             while (true) {
                 viewModel.refreshPosition()
                 delay(500)
+            }
+        }
+
+        // FB27: hide the double-tap seek badge shortly after it appears.
+        LaunchedEffect(seekDirection) {
+            if (seekDirection != null) {
+                delay(700)
+                seekDirection = null
             }
         }
 
@@ -494,6 +523,33 @@ private fun FullscreenPlayerSurface(
                 modifier = Modifier
                     .align(Alignment.BottomCenter)
                     .padding(bottom = 16.dp),
+            )
+        }
+
+        // FB27: double-tap seek feedback — YouTube-style badge on the tapped half.
+        seekDirection?.let { dir ->
+            Icon(
+                imageVector = if (dir == SeekDirection.Forward) {
+                    Icons.Filled.Forward10
+                } else {
+                    Icons.Filled.Replay10
+                },
+                contentDescription = stringResource(
+                    if (dir == SeekDirection.Forward) {
+                        R.string.player_seek_forward
+                    } else {
+                        R.string.player_seek_back
+                    },
+                ),
+                tint = Color.White,
+                modifier = Modifier
+                    .align(
+                        if (dir == SeekDirection.Forward) Alignment.CenterEnd
+                        else Alignment.CenterStart,
+                    )
+                    .padding(horizontal = 24.dp)
+                    .background(Color.Black.copy(alpha = 0.45f), CircleShape)
+                    .padding(12.dp),
             )
         }
     }

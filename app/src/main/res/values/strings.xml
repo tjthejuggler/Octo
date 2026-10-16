@@ -36,6 +36,7 @@
     <string name="library_search_hint">Search title or channel</string>
     <string name="library_filter_clear">Clear</string>
     <string name="library_no_match">No videos match</string>
+    <string name="library_watched_today">Done today</string>
     <!-- Library sorts: Newest / Recently done / Most needed (parts not stretched today) -->
     <string name="library_filter_parts">Filter by body part</string>
     <string name="library_filter_parts_title">Show videos stretching…</string>
@@ -66,6 +67,9 @@
     <string name="player_resize_zoom">Fill screen (crop)</string>
     <string name="player_resize_fit">Fit (black bars)</string>
     <string name="player_show_controls">Show controls</string>
+    <!-- FB27: double-tap seek (YouTube-style) -->
+    <string name="player_seek_back">Rewind 10 seconds</string>
+    <string name="player_seek_forward">Forward 10 seconds</string>
 
     <!-- Settings screen (Phase 5) -->
     <string name="settings_title">Settings</string>

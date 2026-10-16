@@ -1,5 +1,20 @@
 # Octo 🐙
 
+## 2026-10-16 — FB27: double-tap seek + "done today" library badge
+- **Player double-tap seek (YouTube-style)** ([`PlayerScreen.kt`](app/src/main/java/com/example/octo/ui/player/PlayerScreen.kt),
+  [`PlayerViewModel.kt`](app/src/main/java/com/example/octo/ui/player/PlayerViewModel.kt)): the
+  fullscreen video surface now uses `pointerInput` + `detectTapGestures` instead of plain
+  `clickable` — single tap still toggles play/pause + reveals controls (with the standard
+  ~300 ms double-tap disambiguation delay), double tap on the LEFT half seeks −10 s, on the
+  RIGHT half +10 s via new `PlayerViewModel.seekBy`. A transient Replay10/Forward10 badge on
+  the tapped half confirms the action (auto-hides after 700 ms).
+- **Library "done today" badge** ([`LibraryScreen.kt`](app/src/main/java/com/example/octo/ui/library/LibraryScreen.kt),
+  [`LibraryViewModel.kt`](app/src/main/java/com/example/octo/ui/library/LibraryViewModel.kt)):
+  cards whose video has ANY session started today (pending or confirmed — "I watched this
+  today") show a small primary-tinted check dot on the thumbnail corner. Driven by a new
+  `watchedToday: StateFlow<Set<String>>` derived from the existing `lastPlayedPerVideo()`
+  query — no schema/DAO changes.
+
 ## 2026-10-05 — Phase 25: Phase 24 audit & completion (provenance UX + FB25 card polish)
 - **Audit** of the interrupted Phase 24: data/gesture layers were done (v3→v4
   `partSource` migration + pipeline stamping + `applyManualParts` transaction +

@@ -175,6 +175,15 @@ class PlayerViewModel(
         playerField?.seekTo(positionMs.coerceAtLeast(0))
     }
 
+    /**
+     * FB27 double-tap seek: relative nudge (±10 s), clamped at 0; ExoPlayer clamps
+     * the upper bound to the duration itself. No-op before the player exists.
+     */
+    fun seekBy(deltaMs: Long) {
+        val exo = playerField ?: return
+        exo.seekTo((exo.currentPosition + deltaMs).coerceAtLeast(0))
+    }
+
     /** True once a player instance exists (seek bar reads position from it). */
     fun hasPlayer(): Boolean = playerField != null
 

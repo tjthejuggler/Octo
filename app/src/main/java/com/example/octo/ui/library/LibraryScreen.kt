@@ -20,6 +20,7 @@ import androidx.compose.foundation.layout.width
 import androidx.compose.foundation.lazy.LazyColumn
 import androidx.compose.foundation.lazy.items
 import androidx.compose.foundation.rememberScrollState
+import androidx.compose.foundation.shape.CircleShape
 import androidx.compose.foundation.shape.RoundedCornerShape
 import androidx.compose.foundation.verticalScroll
 import androidx.compose.material.icons.Icons
@@ -97,6 +98,8 @@ fun LibraryScreen(
     val selectedParts by viewModel.parts.collectAsState()
     val sort by viewModel.sort.collectAsState()
     val sortDesc by viewModel.sortDesc.collectAsState()
+    // FB27: videoIds with a session started today — drives the watched badge.
+    val watchedToday by viewModel.watchedToday.collectAsState()
     var showAddDialog by remember { mutableStateOf(false) }
     var deleteTarget by remember { mutableStateOf<LibraryViewModel.VideoUiItem?>(null) }
     var addError by remember { mutableStateOf<Boolean>(false) }
@@ -249,6 +252,7 @@ fun LibraryScreen(
                     items(filtered, key = { it.video.id }) { item ->
                         VideoCard(
                             item = item,
+                            watchedToday = item.video.id in watchedToday,
                             onOpen = { onOpenVideo(item.video.id) },
                             onRetry = { viewModel.retry(item.video.id) },
                             onAnalyze = {
@@ -401,6 +405,7 @@ private fun PartsFilterPopup(
 @Composable
 private fun VideoCard(
     item: LibraryViewModel.VideoUiItem,
+    watchedToday: Boolean,
     onOpen: () -> Unit,
     onRetry: () -> Unit,
     onAnalyze: () -> Unit,
@@ -444,6 +449,23 @@ private fun VideoCard(
                                 RoundedCornerShape(4.dp),
                             )
                             .padding(horizontal = 4.dp, vertical = 1.dp),
+                    )
+                }
+                // FB27: minor "already done today" marker — tiny check dot on the
+                // thumbnail corner (any session started today, confirmed or pending).
+                if (watchedToday) {
+                    Icon(
+                        imageVector = Icons.Filled.CheckCircle,
+                        contentDescription = stringResource(R.string.library_watched_today),
+                        tint = MaterialTheme.colorScheme.primary,
+                        modifier = Modifier
+                            .align(Alignment.TopEnd)
+                            .padding(3.dp)
+                            .size(14.dp)
+                            .background(
+                                MaterialTheme.colorScheme.surface.copy(alpha = 0.85f),
+                                CircleShape,
+                            ),
                     )
                 }
             }

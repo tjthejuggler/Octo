@@ -16,6 +16,7 @@ import com.example.octo.data.local.VideoEntity
 import com.example.octo.data.repository.VideoRepository
 import com.example.octo.work.DownloadVideoWorker
 import java.time.LocalDate
+import java.time.ZoneId
 import java.time.format.DateTimeFormatter
 import kotlinx.coroutines.flow.Flow
 import kotlinx.coroutines.flow.MutableStateFlow
@@ -23,6 +24,7 @@ import kotlinx.coroutines.flow.SharingStarted
 import kotlinx.coroutines.flow.StateFlow
 import kotlinx.coroutines.flow.asStateFlow
 import kotlinx.coroutines.flow.combine
+import kotlinx.coroutines.flow.map
 import kotlinx.coroutines.flow.stateIn
 import kotlinx.coroutines.launch
 
@@ -154,6 +156,22 @@ class LibraryViewModel(
     private val lastPlayed: Flow<Map<String, Long>> =
         sessionDao.lastPlayedPerVideo()
             .combine(items) { rows, _ -> rows.associate { it.videoId to it.lastPlayedAt } }
+
+    /**
+     * FB27: videos with at least one session STARTED today (any confirmation state —
+     * pending counts too: "I watched this today"). Drives the card's watched badge.
+     */
+    val watchedToday: StateFlow<Set<String>> =
+        sessionDao.lastPlayedPerVideo()
+            .map { rows ->
+                val zone = ZoneId.systemDefault()
+                val today = LocalDate.now(zone)
+                val dayStart = today.atStartOfDay(zone).toInstant().toEpochMilli()
+                val dayEnd = today.plusDays(1).atStartOfDay(zone).toInstant().toEpochMilli() - 1
+                rows.filter { it.lastPlayedAt in dayStart..dayEnd }
+                    .mapTo(mutableSetOf()) { it.videoId }
+            }
+            .stateIn(viewModelScope, SharingStarted.WhileSubscribed(5_000), emptySet())
 
     /** Body parts already stretched TODAY (confirmed stretches only). */
     private val partsDoneToday: Flow<Set<String>> = let {
