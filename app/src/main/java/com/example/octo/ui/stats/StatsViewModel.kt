@@ -14,6 +14,7 @@ import com.example.octo.data.local.SessionRangeTotalRow
 import com.example.octo.data.local.VideoBodyPartDao
 import com.example.octo.data.local.VideoMuscleDao
 import com.example.octo.data.local.Muscle
+import com.example.octo.data.local.MuscleMinutesRow
 import com.example.octo.data.local.MuscleVideoCountRow
 import java.time.LocalDate
 import java.time.ZoneId
@@ -49,10 +50,10 @@ data class LibraryMuscleStat(
     val videoCount: Int,
 )
 
-/** One row of the frequency list in muscle mode: days stretched in the window. */
+/** One row of the frequency list in muscle mode: confirmed-session minutes. */
 data class MuscleStat(
     val muscle: Muscle,
-    val days: Int,
+    val minutes: Int,
 )
 
 data class StatsUiState(
@@ -76,7 +77,7 @@ data class StatsUiState(
     val libraryParts: List<LibraryPartStat> = emptyList(),
     /** Library coverage per muscle — independent of the selected range. */
     val libraryMuscles: List<LibraryMuscleStat> = emptyList(),
-    /** Days stretched per muscle in the window — the muscle-mode frequency list. */
+    /** Confirmed-session minutes per muscle in the window — muscle-mode frequency list. */
     val muscleStats: List<MuscleStat> = emptyList(),
     /** Sanity cross-check from the raw sessions table ("logged X min across Y sessions"). */
     val sanityMinutes: Int = 0,
@@ -138,7 +139,7 @@ class StatsViewModel(
                 RawStats(totals, partRows, dailyRows, rawRows, activeDates)
             },
             sessionDao.rangeTotals(fromMillis, toMillis),
-            videoMuscleDao.muscleDaysInRange(fromMillis, toMillis),
+            videoMuscleDao.muscleMinutesInRange(fromMillis, toMillis),
             combine(
                 videoBodyPartDao.videoCountsByPart(),
                 videoMuscleDao.videoCountsByMuscle(),
@@ -159,7 +160,7 @@ class StatsViewModel(
         sanity: SessionRangeTotalRow?,
         libraryRows: List<com.example.octo.data.local.PartVideoCountRow>,
         libraryMuscleRows: List<MuscleVideoCountRow>,
-        muscleDayRows: List<MuscleVideoCountRow>,
+        muscleMinuteRows: List<MuscleMinutesRow>,
     ): StatsUiState {
         val totals = raw.totals ?: RangeTotalRow(minutes = 0, sessions = 0, activeDays = 0)
         val minutesByDate = raw.dailyRows.associate { it.date to it.minutes }
@@ -211,7 +212,7 @@ class StatsViewModel(
             sanitySessions = sanity?.sessions ?: 0,
             libraryParts = libraryStats(libraryRows),
             libraryMuscles = libraryMuscleStats(libraryMuscleRows),
-            muscleStats = muscleStats(muscleDayRows),
+            muscleStats = muscleStats(muscleMinuteRows),
         )
     }
 
@@ -231,12 +232,12 @@ class StatsViewModel(
             .sortedWith(compareBy<LibraryMuscleStat> { it.videoCount }.thenBy { it.muscle.displayName })
     }
 
-    /** All muscles, most-stretched-days first — muscle mode of the frequency list. */
-    private fun muscleStats(rows: List<MuscleVideoCountRow>): List<MuscleStat> {
-        val daysById = rows.associate { it.muscleId to it.videoCount }
+    /** All muscles, most minutes first — muscle mode of the frequency list. */
+    private fun muscleStats(rows: List<MuscleMinutesRow>): List<MuscleStat> {
+        val minutesById = rows.associate { it.muscleId to it.minutes }
         return Muscle.entries
-            .map { m -> MuscleStat(m, daysById[m.id] ?: 0) }
-            .sortedWith(compareByDescending<MuscleStat> { it.days }.thenBy { it.muscle.displayName })
+            .map { m -> MuscleStat(m, minutesById[m.id] ?: 0) }
+            .sortedWith(compareByDescending<MuscleStat> { it.minutes }.thenBy { it.muscle.displayName })
     }
 
     private fun LocalDate.iso(): String = format(DateTimeFormatter.ISO_LOCAL_DATE)

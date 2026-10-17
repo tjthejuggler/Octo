@@ -37,21 +37,20 @@ interface VideoMuscleDao {
     fun observeMuscleIdsForVideo(videoId: String): Flow<List<String>>
 
     /**
-     * Per-muscle activity in a window: distinct DAYS on which any CONFIRMED
-     * session covered each muscle (mirrors the dashboard's confirmed-sessions
-     * rule; date bucketed in local time). Reuses [MuscleVideoCountRow] — here
-     * videoCount carries the day count.
+     * Per-muscle minutes in a window: total confirmed-session duration covering
+     * each muscle (mirrors the dashboard's confirmed-sessions rule). A muscle
+     * gets the full duration of every confirmed session whose video tags it.
      */
     @Query(
         """
-        SELECT vm.muscleId, COUNT(DISTINCT date(s.startedAt / 1000, 'unixepoch', 'localtime')) AS videoCount
+        SELECT vm.muscleId, SUM(s.durationSeconds) / 60 AS minutes
         FROM video_muscle_cross_ref vm
         JOIN sessions s ON s.videoId = vm.videoId
         WHERE s.confirmed = 1 AND s.startedAt BETWEEN :fromMillis AND :toMillis
         GROUP BY vm.muscleId
         """
     )
-    fun muscleDaysInRange(fromMillis: Long, toMillis: Long): Flow<List<MuscleVideoCountRow>>
+    fun muscleMinutesInRange(fromMillis: Long, toMillis: Long): Flow<List<MuscleMinutesRow>>
 
     /** Library coverage stats: how many videos are tagged per muscle. */
     @Query(

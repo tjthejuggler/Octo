@@ -459,27 +459,18 @@ private fun FrequencyList(
             MuscleModeToggle(muscleMode = muscleMode, onMuscleModeChange = onMuscleModeChange)
         }
         Text(
-            if (muscleMode) "days stretched per muscle · most first" else "minutes per body part · most first",
+            "minutes per ${if (muscleMode) "muscle" else "body part"} · most first",
             style = MaterialTheme.typography.bodySmall,
             color = MaterialTheme.colorScheme.onSurfaceVariant,
         )
         Spacer(Modifier.height(8.dp))
         if (muscleMode) {
-            // Muscle mode: days-stretched per muscle, RELATIVE coloring (busiest
-            // muscle = full white bar, none = red, least-but-some = orange).
-            val muscles = state.muscleStats
-            val maxDays = muscles.maxOfOrNull { it.days } ?: 0
-            val minNonZero = muscles.map { it.days }.filter { it > 0 }.minOrNull()
-            muscles.forEach { m ->
-                val colorFraction = when {
-                    m.days <= 0 -> 0f
-                    maxDays == minNonZero -> 1f
-                    else -> 0.08f + 0.92f * (m.days - (minNonZero ?: 1)).toFloat() / (maxDays - (minNonZero ?: 1))
-                }
+            // Muscle mode: confirmed-session minutes per muscle on the SAME
+            // window-scaled tier yardstick as the body-part rows below.
+            state.muscleStats.forEach { m ->
                 MuscleFrequencyRow(
                     stat = m,
-                    lengthFraction = if (maxDays == 0) 0f else m.days.toFloat() / maxDays,
-                    colorFraction = colorFraction,
+                    fraction = StatsMath.usageFraction(m.minutes, state.tierStepMinutes),
                 )
             }
         } else {
@@ -498,9 +489,9 @@ private fun FrequencyList(
     }
 }
 
-/** Muscle-mode frequency row: days stretched in the window + relative tier bar. */
+/** Muscle-mode frequency row: minutes in the window on the same tier scale as parts. */
 @Composable
-private fun MuscleFrequencyRow(stat: MuscleStat, lengthFraction: Float, colorFraction: Float) {
+private fun MuscleFrequencyRow(stat: MuscleStat, fraction: Float) {
     val idleColor = MaterialTheme.colorScheme.surfaceVariant.copy(alpha = 0.45f)
     Row(
         modifier = Modifier.fillMaxWidth().padding(vertical = 3.dp),
@@ -509,7 +500,7 @@ private fun MuscleFrequencyRow(stat: MuscleStat, lengthFraction: Float, colorFra
         Text(
             text = stat.muscle.displayName,
             style = MaterialTheme.typography.labelMedium,
-            color = if (stat.days > 0) {
+            color = if (stat.minutes > 0) {
                 MaterialTheme.colorScheme.onSurface
             } else {
                 MaterialTheme.colorScheme.onSurfaceVariant.copy(alpha = 0.7f)
@@ -525,18 +516,18 @@ private fun MuscleFrequencyRow(stat: MuscleStat, lengthFraction: Float, colorFra
                 .clip(RoundedCornerShape(6.dp))
                 .background(idleColor),
         ) {
-            if (lengthFraction > 0f) {
+            if (fraction > 0f) {
                 Box(
                     modifier = Modifier
-                        .fillMaxWidth(lengthFraction)
+                        .fillMaxWidth(fraction)
                         .fillMaxHeight()
-                        .background(usageTierColor(colorFraction)),
+                        .background(usageTierColor(fraction)),
                 )
             }
         }
         Spacer(Modifier.width(8.dp))
         Text(
-            text = if (stat.days == 1) "1 day" else "${stat.days} days",
+            text = "${stat.minutes}m",
             style = MaterialTheme.typography.labelSmall,
             color = MaterialTheme.colorScheme.onSurfaceVariant,
             modifier = Modifier.width(58.dp),
