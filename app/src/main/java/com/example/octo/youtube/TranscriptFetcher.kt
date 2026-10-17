@@ -446,8 +446,14 @@ class TranscriptFetcher(
                 "(KHTML, like Gecko) Chrome/126.0.0.0 Safari/537.36"
         const val BASE_URL_KEY = "baseUrl"
         const val ASR_KIND = "asr"
+        // NOTE: This is NOT a project secret. It is Google's own public InnerTube
+        // API key that ships hardcoded inside every copy of YouTube's web player
+        // (the ANDROID innertube client key). It is publicly documented, not tied
+        // to any Google Cloud project we own, and cannot be rotated or revoked by
+        // us. Secret scanners flag it as a false positive.
+        const val INNERTUBE_PLAYER_KEY = "AIzaSyAO_FJ2SlqU8Q4STEHLGCilw_Y9_11qcW8"
         const val INNERTUBE_PLAYER_URL =
-            "https://www.youtube.com/youtubei/v1/player?key=AIzaSyAO_FJ2SlqU8Q4STEHLGCilw_Y9_11qcW8"
+            "https://www.youtube.com/youtubei/v1/player?key=$INNERTUBE_PLAYER_KEY"
         const val INNERTUBE_CLIENT_VERSION = "20.10.38"
         const val INNERTUBE_USER_AGENT =
             "com.google.android.youtube/$INNERTUBE_CLIENT_VERSION (Linux; U; Android 11) gzip"
