@@ -62,7 +62,6 @@ import com.example.octo.data.local.BodyPart
 import com.example.octo.ui.body.OctoBodyGreen
 import com.example.octo.ui.components.OctoHeader
 import com.example.octo.ui.body.OctoBodyTeal
-import com.example.octo.ui.body.octoRegionColor
 import com.example.octo.ui.body.usageTierColor
 import com.example.octo.ui.components.GlassCard
 import java.util.Locale
@@ -81,6 +80,10 @@ fun StatsScreen(
 ) {
     val state by viewModel.state.collectAsState()
     var expandedPart by remember { mutableStateOf<BodyPart?>(null) }
+
+    // ONE shared Parts/Muscles toggle — flipping it switches BOTH the frequency
+    // list and the library coverage card at once.
+    var muscleMode by rememberSaveable { mutableStateOf(false) }
 
     Column(
         modifier = modifier
@@ -114,6 +117,8 @@ fun StatsScreen(
                     windowLabel = state.range.label,
                     expandedPart = expandedPart,
                     onToggle = { p -> expandedPart = if (expandedPart == p) null else p },
+                    muscleMode = muscleMode,
+                    onMuscleModeChange = { muscleMode = it },
                 )
                 Spacer(Modifier.height(12.dp))
                 SanityNote(
@@ -125,7 +130,13 @@ fun StatsScreen(
 
         // Library coverage is independent of the session window — always visible.
         Spacer(Modifier.height(12.dp))
-        LibraryCoverageCard(parts = state.libraryParts, loading = state.loading)
+        LibraryCoverageCard(
+            parts = state.libraryParts,
+            muscles = state.libraryMuscles,
+            loading = state.loading,
+            muscleMode = muscleMode,
+            onMuscleModeChange = { muscleMode = it },
+        )
         Spacer(Modifier.height(24.dp))
     }
 }
@@ -407,31 +418,130 @@ private fun BucketLabels(
  * = 6 tier steps; bars no longer race to the top just for being the window's
  * busiest part. Tap a row to expand its 30-point sparkline.
  */
+/** The shared Parts/Muscles toggle chip pair used by both stats sections. */
+@Composable
+private fun MuscleModeToggle(muscleMode: Boolean, onMuscleModeChange: (Boolean) -> Unit) {
+    Row(horizontalArrangement = Arrangement.spacedBy(6.dp)) {
+        FilterChip(
+            selected = !muscleMode,
+            onClick = { onMuscleModeChange(false) },
+            label = { Text("Parts") },
+        )
+        FilterChip(
+            selected = muscleMode,
+            onClick = { onMuscleModeChange(true) },
+            label = { Text("Muscles") },
+        )
+    }
+}
+
 @Composable
 private fun FrequencyList(
     state: StatsUiState,
     windowLabel: String,
     expandedPart: BodyPart?,
     onToggle: (BodyPart) -> Unit,
+    muscleMode: Boolean,
+    onMuscleModeChange: (Boolean) -> Unit,
 ) {
-    val parts = state.parts
-    val neglected = parts.filter { it.minutes == 0 }
-    Column(verticalArrangement = Arrangement.spacedBy(2.dp)) {
-        Text(
-            "Which tentacles are stretching",
-            style = MaterialTheme.typography.titleMedium,
-            fontWeight = FontWeight.SemiBold,
-            modifier = Modifier.padding(bottom = 2.dp),
-        )
-        parts.forEach { p ->
-            PartRow(
-                stat = p,
-                fraction = StatsMath.usageFraction(p.minutes, state.tierStepMinutes),
-                expanded = expandedPart == p.part,
-                onToggle = { onToggle(p.part) },
+    GlassCard(modifier = Modifier.fillMaxWidth()) {
+        Column(Modifier.padding(12.dp)) {
+        Row(
+            modifier = Modifier.fillMaxWidth(),
+            horizontalArrangement = Arrangement.SpaceBetween,
+            verticalAlignment = Alignment.CenterVertically,
+        ) {
+            Text(
+                "Tentacle Usage",
+                style = MaterialTheme.typography.titleMedium,
+                fontWeight = FontWeight.SemiBold,
             )
+            MuscleModeToggle(muscleMode = muscleMode, onMuscleModeChange = onMuscleModeChange)
         }
-        NeglectedCallout(neglected = neglected, windowLabel = windowLabel)
+        Text(
+            if (muscleMode) "days stretched per muscle · most first" else "minutes per body part · most first",
+            style = MaterialTheme.typography.bodySmall,
+            color = MaterialTheme.colorScheme.onSurfaceVariant,
+        )
+        Spacer(Modifier.height(8.dp))
+        if (muscleMode) {
+            // Muscle mode: days-stretched per muscle, RELATIVE coloring (busiest
+            // muscle = full white bar, none = red, least-but-some = orange).
+            val muscles = state.muscleStats
+            val maxDays = muscles.maxOfOrNull { it.days } ?: 0
+            val minNonZero = muscles.map { it.days }.filter { it > 0 }.minOrNull()
+            muscles.forEach { m ->
+                val colorFraction = when {
+                    m.days <= 0 -> 0f
+                    maxDays == minNonZero -> 1f
+                    else -> 0.08f + 0.92f * (m.days - (minNonZero ?: 1)).toFloat() / (maxDays - (minNonZero ?: 1))
+                }
+                MuscleFrequencyRow(
+                    stat = m,
+                    lengthFraction = if (maxDays == 0) 0f else m.days.toFloat() / maxDays,
+                    colorFraction = colorFraction,
+                )
+            }
+        } else {
+            val parts = state.parts
+            parts.forEach { p ->
+                PartRow(
+                    stat = p,
+                    fraction = StatsMath.usageFraction(p.minutes, state.tierStepMinutes),
+                    expanded = expandedPart == p.part,
+                    onToggle = { onToggle(p.part) },
+                )
+            }
+            NeglectedCallout(neglected = parts.filter { it.minutes == 0 }, windowLabel = windowLabel)
+        }
+        }
+    }
+}
+
+/** Muscle-mode frequency row: days stretched in the window + relative tier bar. */
+@Composable
+private fun MuscleFrequencyRow(stat: MuscleStat, lengthFraction: Float, colorFraction: Float) {
+    val idleColor = MaterialTheme.colorScheme.surfaceVariant.copy(alpha = 0.45f)
+    Row(
+        modifier = Modifier.fillMaxWidth().padding(vertical = 3.dp),
+        verticalAlignment = Alignment.CenterVertically,
+    ) {
+        Text(
+            text = stat.muscle.displayName,
+            style = MaterialTheme.typography.labelMedium,
+            color = if (stat.days > 0) {
+                MaterialTheme.colorScheme.onSurface
+            } else {
+                MaterialTheme.colorScheme.onSurfaceVariant.copy(alpha = 0.7f)
+            },
+            maxLines = 1,
+            overflow = TextOverflow.Ellipsis,
+            modifier = Modifier.width(118.dp),
+        )
+        Box(
+            modifier = Modifier
+                .weight(1f)
+                .height(12.dp)
+                .clip(RoundedCornerShape(6.dp))
+                .background(idleColor),
+        ) {
+            if (lengthFraction > 0f) {
+                Box(
+                    modifier = Modifier
+                        .fillMaxWidth(lengthFraction)
+                        .fillMaxHeight()
+                        .background(usageTierColor(colorFraction)),
+                )
+            }
+        }
+        Spacer(Modifier.width(8.dp))
+        Text(
+            text = if (stat.days == 1) "1 day" else "${stat.days} days",
+            style = MaterialTheme.typography.labelSmall,
+            color = MaterialTheme.colorScheme.onSurfaceVariant,
+            modifier = Modifier.width(58.dp),
+            textAlign = TextAlign.End,
+        )
     }
 }
 
@@ -542,68 +652,103 @@ private fun Sparkline(series: List<Int>, modifier: Modifier = Modifier) {
 /** Playful callout for parts with 0 minutes in the window — the stiff tentacles. */
 @Composable
 private fun NeglectedCallout(neglected: List<PartStat>, windowLabel: String) {
-    GlassCard(
-        modifier = Modifier
-            .fillMaxWidth()
-            .padding(top = 10.dp),
-    ) {
-        Column(Modifier.padding(12.dp)) {
+    Column(Modifier.padding(top = 8.dp)) {
+        Text(
+            if (neglected.isEmpty()) {
+                "🐙 Every tentacle got some love — nothing stiff in this window!"
+            } else {
+                "🦑 Stiff tentacles (${neglected.size})"
+            },
+            style = MaterialTheme.typography.titleSmall,
+            fontWeight = FontWeight.SemiBold,
+        )
+        if (neglected.isNotEmpty()) {
+            Spacer(Modifier.height(2.dp))
             Text(
-                if (neglected.isEmpty()) {
-                    "🐙 Every tentacle got some love — nothing stiff in this window!"
-                } else {
-                    "🦑 Stiff tentacles (${neglected.size})"
-                },
-                style = MaterialTheme.typography.titleSmall,
-                fontWeight = FontWeight.SemiBold,
+                "${neglected.joinToString { it.part.displayName }} — the octopus hasn't " +
+                    "stretched these in the last $windowLabel. Loosen them up, one arm at a time.",
+                style = MaterialTheme.typography.bodySmall,
+                color = MaterialTheme.colorScheme.onSurfaceVariant,
             )
-            if (neglected.isNotEmpty()) {
-                Spacer(Modifier.height(2.dp))
-                Text(
-                    "${neglected.joinToString { it.part.displayName }} — the octopus hasn't " +
-                        "stretched these in the last $windowLabel. Loosen them up, one arm at a time.",
-                    style = MaterialTheme.typography.bodySmall,
-                    color = MaterialTheme.colorScheme.onSurfaceVariant,
-                )
-            }
         }
     }
 }
 
 /**
- * Library coverage: how many videos in the library cover each body part,
- * scarcest first — the top of the list is your shopping list for new videos.
+ * Library coverage: how many videos in the library cover each body part (or,
+ * toggled, each muscle), scarcest first — the top of the list is your shopping
+ * list for new videos.
+ *
+ * Bars are RELATIVE to the current list: whichever part/muscle has the most
+ * videos is a full white bar, none is red, the least-but-some is orange, and
+ * everything else interpolates through the tier ramp in between. Bar length
+ * likewise scales to the list's maximum count.
  */
 @Composable
-private fun LibraryCoverageCard(parts: List<LibraryPartStat>, loading: Boolean) {
-    val missing = parts.filter { it.videoCount == 0 }
-    val total = parts.sumOf { it.videoCount }
+private fun LibraryCoverageCard(
+    parts: List<LibraryPartStat>,
+    muscles: List<LibraryMuscleStat>,
+    loading: Boolean,
+    muscleMode: Boolean,
+    onMuscleModeChange: (Boolean) -> Unit,
+) {
+    val counts = if (muscleMode) muscles.map { it.videoCount } else parts.map { it.videoCount }
+    val maxCount = counts.maxOrNull() ?: 0
+    val minNonZero = counts.filter { it > 0 }.minOrNull()
+    val missingNames = if (muscleMode) {
+        muscles.filter { it.videoCount == 0 }.map { it.muscle.displayName }
+    } else {
+        parts.filter { it.videoCount == 0 }.map { it.part.displayName }
+    }
+    val total = counts.sum()
     GlassCard(modifier = Modifier.fillMaxWidth()) {
         Column(Modifier.padding(12.dp)) {
-            Text("Library coverage", style = MaterialTheme.typography.titleMedium, fontWeight = FontWeight.SemiBold)
+            Row(
+                modifier = Modifier.fillMaxWidth(),
+                horizontalArrangement = Arrangement.SpaceBetween,
+                verticalAlignment = Alignment.CenterVertically,
+            ) {
+                Text("Library coverage", style = MaterialTheme.typography.titleMedium, fontWeight = FontWeight.SemiBold)
+                MuscleModeToggle(muscleMode = muscleMode, onMuscleModeChange = onMuscleModeChange)
+            }
             Text(
-                "videos per body part · scarcest first",
+                if (muscleMode) "videos per muscle · scarcest first" else "videos per body part · scarcest first",
                 style = MaterialTheme.typography.bodySmall,
                 color = MaterialTheme.colorScheme.onSurfaceVariant,
             )
             Spacer(Modifier.height(8.dp))
-            if (loading && parts.isEmpty()) {
+            if (loading && counts.isEmpty()) {
                 Text(
                     "counting tentacles… 🐙",
                     style = MaterialTheme.typography.bodySmall,
                     color = MaterialTheme.colorScheme.onSurfaceVariant,
                 )
             } else {
-                val maxCount = parts.maxOfOrNull { it.videoCount } ?: 0
-                parts.forEach { p ->
-                    LibraryPartRow(stat = p, fraction = if (maxCount == 0) 0f else p.videoCount.toFloat() / maxCount)
+                if (muscleMode) {
+                    muscles.forEach { m ->
+                        LibraryBarRow(
+                            name = m.muscle.displayName,
+                            videoCount = m.videoCount,
+                            maxCount = maxCount,
+                            minNonZero = minNonZero,
+                        )
+                    }
+                } else {
+                    parts.forEach { p ->
+                        LibraryBarRow(
+                            name = p.part.displayName,
+                            videoCount = p.videoCount,
+                            maxCount = maxCount,
+                            minNonZero = minNonZero,
+                        )
+                    }
                 }
                 Spacer(Modifier.height(6.dp))
                 Text(
-                    if (missing.isEmpty()) {
-                        "🐙 Every body part has at least one video — well-stocked larder!"
+                    if (missingNames.isEmpty()) {
+                        "🐙 Every ${if (muscleMode) "muscle" else "body part"} has at least one video — well-stocked larder!"
                     } else {
-                        "🦑 No videos yet for: ${missing.joinToString { it.part.displayName }} — go hunt some down!"
+                        "🦑 No videos yet for: ${missingNames.joinToString()} — go hunt some down!"
                     },
                     style = MaterialTheme.typography.bodySmall,
                     color = MaterialTheme.colorScheme.onSurfaceVariant,
@@ -612,7 +757,7 @@ private fun LibraryCoverageCard(parts: List<LibraryPartStat>, loading: Boolean) 
             if (total > 0) {
                 Spacer(Modifier.height(2.dp))
                 Text(
-                    "$total tags across ${parts.count { it.videoCount > 0 }} of ${parts.size} parts",
+                    "$total tags across ${counts.count { it > 0 }} of ${counts.size} ${if (muscleMode) "muscles" else "parts"}",
                     style = MaterialTheme.typography.labelSmall,
                     color = MaterialTheme.colorScheme.onSurfaceVariant,
                 )
@@ -621,17 +766,33 @@ private fun LibraryCoverageCard(parts: List<LibraryPartStat>, loading: Boolean) 
     }
 }
 
+/**
+ * One coverage bar. Length = count / list max (the busiest row fills the track).
+ * Color rides the [usageTierColor] ramp over a RELATIVE 0..1 spread: 0 → red,
+ * least-nonzero → orange-ish, list max → white.
+ */
 @Composable
-private fun LibraryPartRow(stat: LibraryPartStat, fraction: Float) {
+private fun LibraryBarRow(
+    name: String,
+    videoCount: Int,
+    maxCount: Int,
+    minNonZero: Int?,
+) {
     val idleColor = MaterialTheme.colorScheme.surfaceVariant.copy(alpha = 0.45f)
+    val lengthFraction = if (maxCount == 0) 0f else videoCount.toFloat() / maxCount
+    val colorFraction = when {
+        videoCount <= 0 -> 0f // red
+        maxCount == minNonZero -> 1f // every nonzero row ties for the top → all white
+        else -> 0.08f + 0.92f * (videoCount - (minNonZero ?: 1)).toFloat() / (maxCount - (minNonZero ?: 1))
+    }
     Row(
         modifier = Modifier.fillMaxWidth().padding(vertical = 3.dp),
         verticalAlignment = Alignment.CenterVertically,
     ) {
         Text(
-            text = stat.part.displayName,
+            text = name,
             style = MaterialTheme.typography.labelMedium,
-            color = if (stat.videoCount > 0) {
+            color = if (videoCount > 0) {
                 MaterialTheme.colorScheme.onSurface
             } else {
                 MaterialTheme.colorScheme.onSurfaceVariant.copy(alpha = 0.7f)
@@ -647,18 +808,18 @@ private fun LibraryPartRow(stat: LibraryPartStat, fraction: Float) {
                 .clip(RoundedCornerShape(6.dp))
                 .background(idleColor),
         ) {
-            if (fraction > 0f) {
+            if (lengthFraction > 0f) {
                 Box(
                     modifier = Modifier
-                        .fillMaxWidth(fraction)
+                        .fillMaxWidth(lengthFraction)
                         .fillMaxHeight()
-                        .background(octoRegionColor(stat.videoCount)),
+                        .background(usageTierColor(colorFraction)),
                 )
             }
         }
         Spacer(Modifier.width(8.dp))
         Text(
-            text = plural(stat.videoCount),
+            text = plural(videoCount),
             style = MaterialTheme.typography.labelSmall,
             color = MaterialTheme.colorScheme.onSurfaceVariant,
             modifier = Modifier.width(58.dp),
