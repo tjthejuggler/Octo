@@ -63,6 +63,20 @@
             </intent-filter>
         </activity>
 
+        <!-- Home-screen widget: the octopus-man rendered off the dashboard
+             drawing pipeline; tap opens the app (see widget/OctoWidgetProvider.kt). -->
+        <receiver
+            android:name=".widget.OctoWidgetProvider"
+            android:exported="false"
+            android:label="@string/octo_widget_label">
+            <intent-filter>
+                <action android:name="android.appwidget.action.APPWIDGET_UPDATE" />
+            </intent-filter>
+            <meta-data
+                android:name="android.appwidget.provider"
+                android:resource="@xml/octo_widget_info" />
+        </receiver>
+
         <!-- DEBUG-ONLY adb test hook (Phase 6): adb shell am start seeds daily
              aggregates. exported is required for the shell to launch it, but the
              BuildConfig.DEBUG guard in code makes it a no-op (instant finish) in
@@ -75,6 +89,19 @@
             android:screenOrientation="portrait"
             android:taskAffinity=""
             android:theme="@style/Theme.Octo.Translucent" />
-    </application>
 
+        <!--
+            Live octopus-man figure for Tail's combined scene widget
+            (Kenga twin protocol). Read-only; signature-gated by Tail's
+            TAIL_INTEGRATION permission (Tail shares our keystore).
+            Protocol: content://com.example.octo.figure/v1/figure with
+            columns figure (PNG blob) / hash / updated — Tail hash-gates
+            its pulls so repeat refreshes cost one cheap query.
+        -->
+        <provider
+            android:name=".widget.FigureSnapshotProvider"
+            android:authorities="com.example.octo.figure"
+            android:exported="true"
+            android:readPermission="com.example.tail.permission.TAIL_INTEGRATION" />
+    </application>
 </manifest>

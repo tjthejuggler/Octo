@@ -700,13 +700,13 @@ val OctoBodyTeal = Color(0xFF3DC9B0)
 val OctoBodyGreen = Color(0xFF7CE87B)
 
 /** Decorative tentacle-finger clusters — a shade deeper than idle. */
-private val TentacleDeco = Color(0xFF32444C)
+internal val TentacleDeco = Color(0xFF32444C)
 
-private val BorderIdle = Color(0x33D8E8E6)
-private val MuscleLine = Color(0xFF1C343C).copy(alpha = 0.8f)
-private val Cup = Color(0xFFD8E8E6).copy(alpha = 0.9f)
+internal val BorderIdle = Color(0x33D8E8E6)
+internal val MuscleLine = Color(0xFF1C343C).copy(alpha = 0.8f)
+internal val Cup = Color(0xFFD8E8E6).copy(alpha = 0.9f)
 
-private const val GLOW_LAYERS = 3
+internal const val GLOW_LAYERS = 3
 
 /** Region color for a given minutes value — part-detail + stats charts (minutes-based). */
 fun octoRegionColor(minutes: Int): Color =

@@ -113,7 +113,7 @@ class OctoApplication : Application(), Configuration.Provider {
 
         // Phase 4: player + session/Tail integration.
         val tailIntegrationClient = TailIntegrationClient(context.applicationContext)
-        val sessionRepository = SessionRepository(database)
+        val sessionRepository = SessionRepository(database, context.applicationContext)
         val sessionPlayerManager = SessionPlayerManager(
             context = context.applicationContext,
             okHttpClient = okHttpClient,

@@ -1,6 +1,11 @@
 <resources>
     <string name="app_name">Octo</string>
 
+    <!-- Home-screen widget (OctoWidgetProvider) -->
+    <string name="octo_widget_label">Octo</string>
+    <string name="octo_widget_description">The octopus-man from your dashboard. Tap to open Octo.</string>
+    <string name="octo_widget_item_description">The Octo octopus-man</string>
+
     <!-- Share ingestion (ShareIngestActivity) -->
     <string name="share_activity_label">Add to Octo</string>
     <string name="share_added">Added to Octo 🐙</string>

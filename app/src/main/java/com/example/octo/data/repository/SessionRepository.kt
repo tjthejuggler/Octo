@@ -1,9 +1,11 @@
 package com.example.octo.data.repository
 
+import android.content.Context
 import androidx.room.withTransaction
 import com.example.octo.data.local.CreditedParts
 import com.example.octo.data.local.OctoDatabase
 import com.example.octo.data.local.SessionEntity
+import com.example.octo.widget.FigureSnapshotProvider
 import java.time.Instant
 import java.time.LocalDate
 import java.time.ZoneId
@@ -20,7 +22,10 @@ import kotlin.math.roundToInt
  * [undoConfirmedSession] reverses a confirmation exactly via the credited-per-part
  * snapshot stored on the row at confirm time.
  */
-class SessionRepository(private val db: OctoDatabase) {
+class SessionRepository(
+    private val db: OctoDatabase,
+    private val appContext: Context,
+) {
 
     /** Library row for the player screen (title/duration/files). */
     suspend fun getVideo(videoId: String): com.example.octo.data.local.VideoEntity? =
@@ -87,6 +92,10 @@ class SessionRepository(private val db: OctoDatabase) {
             db.sessionDao().confirmSession(sessionRowId, CreditedParts.encode(credited))
             creditedMinutes = minutes
         }
+        // Tail combined-scene widget: re-render + ping immediately at the
+        // data-write point (NOT just on MainActivity resume — the user can
+        // confirm a stretch and go straight home without a resume event).
+        if (creditedMinutes != null) FigureSnapshotProvider.refreshAndPing(appContext)
         return creditedMinutes
     }
 
@@ -106,6 +115,7 @@ class SessionRepository(private val db: OctoDatabase) {
      * exact even after the video's body parts were re-analyzed or the video deleted.
      */
     suspend fun undoConfirmedSession(sessionRowId: Long) {
+        var undone = false
         db.withTransaction {
             val session = db.sessionDao().byId(sessionRowId) ?: return@withTransaction
             if (!session.confirmed) return@withTransaction
@@ -114,7 +124,10 @@ class SessionRepository(private val db: OctoDatabase) {
                 db.bodyPartDao().decrement(date = date, bodyPartId = partId, minutes = minutes, sessions = 1)
             }
             db.sessionDao().delete(sessionRowId)
+            undone = true
         }
+        // Aggregates changed -> Tail scene figure is stale until re-pulled.
+        if (undone) FigureSnapshotProvider.refreshAndPing(appContext)
     }
 
     /** Abandons a session without recording anything (user backed out with no time kept). */

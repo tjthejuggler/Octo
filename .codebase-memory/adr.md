@@ -1,18 +1,17 @@
-# ADR-031: Legend removed from video detail; percent ring = tier rainbow sweep
+# ADR: Home-screen widget (octopus-man, mirrored in Kenga)
 
-Date: 2026-10-16
-
-## Status
-Accepted (implemented, deployed via installDebug)
+**Status:** Accepted (2026-11-08; final form after 4 iterations)
 
 ## Context
-Two UI refinements requested after ADR-030: (1) the video-detail legend ("Not in this video" / "This video" dots) was redundant — the minis are self-explanatory; (2) the dashboard PercentRing used a static teal→green gradient, disconnected from the new tier system.
+Users want the dashboard's mascot on the home screen: tap → open the app's main screen. Iteration history: (1) StackView swipe-to-flip — superseded; (2) bare 1×1 figure — clipped/dead space; (3) rounded card — rejected by user ("get rid of background bounding boxes"); (4) **final: bare mascot, transparent background**.
 
 ## Decision
-1. [`MiniBodyMapCard`](VideoDetailScreen.kt): legend row deleted; `previewTargetColor`/`LegendDot` helpers removed; legend strings (`video_detail_legend_today/others/video`) dropped from strings.xml.
-2. [`PercentRing`](BodyScreen.kt): track arc = translucent idle red; progress arc uses a sweepGradient with the SAME tier stops (red→orange→green→blue→pink→yellow→white) rotated +25% so red starts at the 12 o'clock arc origin. At 0% the ring shows only the faint red track; as % grows, the visible sweep morphs through the tier progression (≈14.3% per tier stop). Sweep animates (900ms tween) as before.
+- Classic `AppWidgetProvider` (no Glance), default **1 wide × 2 tall cells** (`targetCellWidth 1`, `targetCellHeight 2`), freely resizable, front view only.
+- The shipped bitmap is the mascot ONLY: rendered with the dashboard's exact pipeline, cropped to his alpha bounds, transparent background — no card, no padding box.
+- **CRITICAL renderer rule:** offscreen `CanvasDrawScope.scale(s, s)` MUST pass `pivot = Offset.Zero`. The default pivot is the canvas CENTER, which shifts the drawing right/down by `500s(1−s)` and clips the figure's right side + feet at widget scale (the dashboard masks this via aspect-matched sizing + calibrated centering constants).
+- Delivery: `setImageViewBitmap` with a 160k-pixel binder-safety downscale cap (~1 MB RemoteViews limit). No content URIs (launcher grants failed in the field).
+- Tap = `PendingIntent` → `MainActivity`. Refresh: widget add/resize + `MainActivity.onResume()` (`requestUpdate`); tier colors from DB (`bodyPartDao().forDayOnce` / `pbRepository.observeTodaySetCounts`).
 
 ## Consequences
-- Ring, body-map regions, and plates now share one color language (todayTierColor stops).
-- sweepGradient linearly interpolates between stops, giving the smooth "rainbow oval" morph the user described.
-- Files touched: VideoDetailScreen.kt, strings.xml, BodyScreen.kt; compile + installDebug green.
+- Visual parity via shared geometry/palette; Kenga inherits dashboard changes automatically (direct `drawBodyMap` reuse), Octo's hand-mirrored `OctoWidgetRenderer` must track `OctopusBodyView.drawBody` changes.
+- Push-driven refresh; midnight tier resets appear on next app open / resize / re-add.

@@ -25,6 +25,7 @@ import com.example.octo.ui.navigation.OctoNavHost
 import com.example.octo.ui.navigation.PART_ROUTE_BASE
 import com.example.octo.ui.navigation.PLAYER_ROUTE_BASE
 import com.example.octo.ui.navigation.VIDEO_ROUTE_BASE
+import com.example.octo.widget.OctoWidgetProvider
 import androidx.compose.ui.graphics.Color
 import com.example.octo.ui.theme.OctoTheme
 
@@ -43,6 +44,16 @@ class MainActivity : ComponentActivity() {
                 OctoApp()
             }
         }
+    }
+
+    override fun onResume() {
+        super.onResume()
+        // Keep the home-screen widget in sync: sessions logged (and confirmed)
+        // since it last rendered change the tier colors on its octopus-man.
+        OctoWidgetProvider.requestUpdate(this)
+        // Tail combined-scene widget: refresh our served figure + ping
+        // Tail (cheap no-op ping when Tail isn't installed).
+        com.example.octo.widget.FigureSnapshotProvider.refreshAndPing(this)
     }
 }
 

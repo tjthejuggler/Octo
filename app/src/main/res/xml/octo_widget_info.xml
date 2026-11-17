@@ -1,0 +1,13 @@
+<?xml version="1.0" encoding="utf-8"?>
+<!-- 1 wide × 2 tall cells (portrait figure needs height); freely resizable. -->
+<appwidget-provider xmlns:android="http://schemas.android.com/apk/res/android"
+    android:minWidth="48dp"
+    android:minHeight="110dp"
+    android:targetCellWidth="1"
+    android:targetCellHeight="2"
+    android:resizeMode="horizontal|vertical"
+    android:widgetCategory="home_screen"
+    android:initialLayout="@layout/octo_widget"
+    android:previewLayout="@layout/octo_widget"
+    android:updatePeriodMillis="0"
+    android:description="@string/octo_widget_description" />
