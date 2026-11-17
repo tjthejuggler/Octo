@@ -1,7 +1,11 @@
 package com.example.octo.ui.library
 
+import android.content.Intent
+import android.net.Uri
+import androidx.compose.foundation.ExperimentalFoundationApi
 import androidx.compose.foundation.background
 import androidx.compose.foundation.clickable
+import androidx.compose.foundation.combinedClickable
 import androidx.compose.foundation.horizontalScroll
 import androidx.compose.foundation.layout.Arrangement
 import androidx.compose.foundation.layout.Box
@@ -25,18 +29,17 @@ import androidx.compose.foundation.shape.RoundedCornerShape
 import androidx.compose.foundation.verticalScroll
 import androidx.compose.material.icons.Icons
 import androidx.compose.material.icons.filled.Add
+import androidx.compose.material.icons.filled.AutoAwesome
 import androidx.compose.material.icons.filled.CheckCircle
 import androidx.compose.material.icons.filled.Clear
 import androidx.compose.material.icons.filled.Delete
 import androidx.compose.material.icons.filled.FilterList
-import androidx.compose.material.icons.filled.MoreVert
+import androidx.compose.material.icons.filled.OpenInNew
 import androidx.compose.material.icons.filled.Refresh
 import androidx.compose.material.icons.filled.Search
 import androidx.compose.material3.AlertDialog
 import androidx.compose.material3.Card
 import androidx.compose.material3.CircularProgressIndicator
-import androidx.compose.material3.DropdownMenu
-import androidx.compose.material3.DropdownMenuItem
 import androidx.compose.material3.ExperimentalMaterial3Api
 import androidx.compose.material3.FilterChip
 import androidx.compose.material3.FloatingActionButton
@@ -60,6 +63,7 @@ import androidx.compose.ui.Modifier
 import androidx.compose.ui.draw.clip
 import androidx.compose.ui.graphics.Color
 import androidx.compose.ui.layout.ContentScale
+import androidx.compose.ui.platform.LocalContext
 import androidx.compose.ui.res.stringResource
 import androidx.compose.ui.text.font.FontWeight
 import androidx.compose.ui.text.style.TextOverflow
@@ -74,6 +78,7 @@ import com.example.octo.ui.components.GlassTone
 import com.example.octo.ui.components.OctoHeader
 import com.example.octo.ui.components.TwoRowChips
 import java.io.File
+import java.time.LocalDate
 
 /**
  * Library screen — Phase 21 (feedback round 4), card behavior reworked Phase 26 (FB26):
@@ -100,11 +105,16 @@ fun LibraryScreen(
     val sortDesc by viewModel.sortDesc.collectAsState()
     // FB27: videoIds with a session started today — drives the watched badge.
     val watchedToday by viewModel.watchedToday.collectAsState()
+    // FB28: videoId → last session timestamp — drives the recency tint + age badge.
+    val lastPlayed by viewModel.lastPlayed.collectAsState()
+    val context = LocalContext.current
     var showAddDialog by remember { mutableStateOf(false) }
     var deleteTarget by remember { mutableStateOf<LibraryViewModel.VideoUiItem?>(null) }
     var addError by remember { mutableStateOf<Boolean>(false) }
     // Phase 24: Analyze pressed on a DONE+MANUAL row → confirm before replacing edits.
     var analyzeConfirmTarget by remember { mutableStateOf<LibraryViewModel.VideoUiItem?>(null) }
+    // FB28: long-pressed card → popup menu (Analyze / YouTube / Delete).
+    var menuTarget by remember { mutableStateOf<LibraryViewModel.VideoUiItem?>(null) }
     val filtersActive = query.isNotBlank() || selectedParts.isNotEmpty()
 
     // contentWindowInsets=0: the root app scaffold already applies the system-bar
@@ -253,16 +263,10 @@ fun LibraryScreen(
                         VideoCard(
                             item = item,
                             watchedToday = item.video.id in watchedToday,
+                            lastPlayedAt = lastPlayed[item.video.id],
                             onOpen = { onOpenVideo(item.video.id) },
                             onRetry = { viewModel.retry(item.video.id) },
-                            onAnalyze = {
-                                if (item.needsManualConfirmBeforeAnalyze) {
-                                    analyzeConfirmTarget = item
-                                } else {
-                                    viewModel.analyze(item.video.id)
-                                }
-                            },
-                            onDelete = { deleteTarget = item },
+                            onLongPress = { menuTarget = item },
                         )
                     }
                 }
@@ -329,6 +333,128 @@ fun LibraryScreen(
                     Text(stringResource(R.string.library_cancel))
                 }
             },
+        )
+    }
+
+    // FB28: long-press card menu (replaces the overflow-dots dropdown).
+    menuTarget?.let { target ->
+        VideoMenuSheet(
+            item = target,
+            onDismiss = { menuTarget = null },
+            onAnalyze = {
+                menuTarget = null
+                if (target.needsManualConfirmBeforeAnalyze) {
+                    analyzeConfirmTarget = target
+                } else {
+                    viewModel.analyze(target.video.id)
+                }
+            },
+            onOpenYouTube = {
+                menuTarget = null
+                // Every row stores the canonical watch URL (PK = videoId), so
+                // this works for legacy rows too — fallback purely defensive.
+                val url = target.video.url.ifBlank {
+                    "https://www.youtube.com/watch?v=${target.video.id}"
+                }
+                context.startActivity(
+                    Intent(Intent.ACTION_VIEW, Uri.parse(url))
+                        .addFlags(Intent.FLAG_ACTIVITY_NEW_TASK),
+                )
+            },
+            onDelete = {
+                menuTarget = null
+                deleteTarget = target
+            },
+        )
+    }
+}
+
+/**
+ * FB28 long-press card menu: a compact glass sheet with the actions the old
+ * overflow-dots dropdown used to host — Analyze (when applicable), Open on
+ * YouTube (canonical URL stored on every row), and Delete (which then shows
+ * the existing confirmation dialog).
+ */
+@Composable
+private fun VideoMenuSheet(
+    item: LibraryViewModel.VideoUiItem,
+    onDismiss: () -> Unit,
+    onAnalyze: () -> Unit,
+    onOpenYouTube: () -> Unit,
+    onDelete: () -> Unit,
+) {
+    AlertDialog(
+        onDismissRequest = onDismiss,
+        containerColor = Color.Transparent,
+        text = {
+            GlassCard(tone = GlassTone.Deep) {
+                Column {
+                    Text(
+                        text = item.video.title,
+                        style = MaterialTheme.typography.titleSmall,
+                        maxLines = 2,
+                        overflow = TextOverflow.Ellipsis,
+                        modifier = Modifier
+                            .fillMaxWidth()
+                            .padding(horizontal = 16.dp, vertical = 8.dp),
+                    )
+                    if (item.canAnalyze) {
+                        MenuRow(
+                            icon = { Icon(Icons.Filled.AutoAwesome, contentDescription = null) },
+                            label = stringResource(R.string.library_analyze),
+                            onClick = onAnalyze,
+                        )
+                    }
+                    MenuRow(
+                        icon = { Icon(Icons.Filled.OpenInNew, contentDescription = null) },
+                        label = stringResource(R.string.library_open_on_youtube),
+                        onClick = onOpenYouTube,
+                        showDivider = true,
+                    )
+                    MenuRow(
+                        icon = { Icon(Icons.Filled.Delete, contentDescription = null) },
+                        label = stringResource(R.string.library_delete),
+                        onClick = onDelete,
+                        destructive = true,
+                    )
+                }
+            }
+        },
+        confirmButton = {},
+    )
+}
+
+/** One tappable row inside [VideoMenuSheet]. */
+@Composable
+private fun MenuRow(
+    icon: @Composable () -> Unit,
+    label: String,
+    onClick: () -> Unit,
+    destructive: Boolean = false,
+    showDivider: Boolean = false,
+) {
+    if (showDivider) {
+        Box(
+            Modifier
+                .fillMaxWidth()
+                .padding(horizontal = 16.dp)
+                .height(1.dp)
+                .background(MaterialTheme.colorScheme.outlineVariant),
+        )
+    }
+    Row(
+        modifier = Modifier
+            .fillMaxWidth()
+            .clickable(onClick = onClick)
+            .padding(horizontal = 16.dp, vertical = 12.dp),
+        verticalAlignment = Alignment.CenterVertically,
+    ) {
+        icon()
+        Spacer(Modifier.width(12.dp))
+        Text(
+            text = label,
+            style = MaterialTheme.typography.bodyLarge,
+            color = if (destructive) MaterialTheme.colorScheme.error else Color.Unspecified,
         )
     }
 }
@@ -401,29 +527,38 @@ private fun PartsFilterPopup(
  * Phase 21 compact card; FB26 rework: the whole card is a single click target
  * that opens the video-detail screen (no explicit play button). Part tags use
  * the shared two-row layout (row 1 fixed, row 2 scrollable, no "+n").
+ *
+ * FB28: the pane is tinted by last-played recency (tier palette shared with the
+ * body map) and carries a compact age badge in the top-right corner. The old
+ * overflow-dots column is gone — long-press the card for its menu instead.
  */
+@OptIn(ExperimentalFoundationApi::class)
 @Composable
 private fun VideoCard(
     item: LibraryViewModel.VideoUiItem,
     watchedToday: Boolean,
+    lastPlayedAt: Long?,
     onOpen: () -> Unit,
     onRetry: () -> Unit,
-    onAnalyze: () -> Unit,
-    onDelete: () -> Unit,
+    onLongPress: () -> Unit,
 ) {
     val video = item.video
-    var menuOpen by remember { mutableStateOf(false) }
+    // FB28: recency tint + age marker derived from the last session timestamp.
+    val tint = recencyBucket(lastPlayedAt, LocalDate.now()).tierColor()
+    val ageMarker = ageMarkerLabel(lastPlayedAt, LocalDate.now())
     GlassCard(
         modifier = Modifier
             .fillMaxWidth()
-            .clickable(onClick = onOpen),
+            .combinedClickable(onClick = onOpen, onLongClick = onLongPress),
         shape = RoundedCornerShape(20.dp),
+        tint = tint,
     ) {
-        Row(
-            modifier = Modifier.padding(8.dp),
-            verticalAlignment = Alignment.CenterVertically,
-            horizontalArrangement = Arrangement.spacedBy(10.dp),
-        ) {
+        Box {
+            Row(
+                modifier = Modifier.padding(8.dp),
+                verticalAlignment = Alignment.CenterVertically,
+                horizontalArrangement = Arrangement.spacedBy(10.dp),
+            ) {
             Box(
                 modifier = Modifier
                     .width(96.dp)
@@ -470,7 +605,12 @@ private fun VideoCard(
                 }
             }
 
-            Column(modifier = Modifier.weight(1f)) {
+                Column(
+                    modifier = Modifier
+                        .weight(1f)
+                        // FB28: clearance so the corner age badge never covers text.
+                        .padding(end = if (ageMarker != null) 42.dp else 0.dp),
+                ) {
                 Text(
                     text = video.title,
                     style = MaterialTheme.typography.bodyMedium,
@@ -533,10 +673,9 @@ private fun VideoCard(
                 }
             }
 
-            // Compact icon actions: play (or retry when failed) + overflow menu.
-            Column(horizontalAlignment = Alignment.CenterHorizontally) {
-                // FB26: no play button — the card itself opens video detail.
-                // A small retry icon stays only on FAILED cards (explicitly allowed).
+                // FB26: no play button — the card itself opens video detail. FB28:
+                // no menu dots either — long-press opens the card menu. A small
+                // retry icon stays only on FAILED cards (explicitly allowed).
                 if (item.isFailed) {
                     IconButton(onClick = onRetry, modifier = Modifier.size(36.dp)) {
                         Icon(
@@ -546,35 +685,22 @@ private fun VideoCard(
                         )
                     }
                 }
-                Box {
-                    IconButton(onClick = { menuOpen = true }, modifier = Modifier.size(36.dp)) {
-                        Icon(
-                            Icons.Filled.MoreVert,
-                            contentDescription = stringResource(R.string.library_menu),
-                        )
-                    }
-                    DropdownMenu(expanded = menuOpen, onDismissRequest = { menuOpen = false }) {
-                        if (item.canAnalyze) {
-                            DropdownMenuItem(
-                                text = { Text(stringResource(R.string.library_analyze)) },
-                                onClick = {
-                                    menuOpen = false
-                                    onAnalyze()
-                                },
-                            )
-                        }
-                        DropdownMenuItem(
-                            text = { Text(stringResource(R.string.library_delete)) },
-                            leadingIcon = {
-                                Icon(Icons.Filled.Delete, contentDescription = null)
-                            },
-                            onClick = {
-                                menuOpen = false
-                                onDelete()
-                            },
-                        )
-                    }
-                }
+            }
+
+            // FB28: compact age marker in the upper-right corner (3d, 4w, 2mo…).
+            // The pill carries the card's own tier color so the bucket reads at
+            // a glance, echoing the pane tint.
+            ageMarker?.let { marker ->
+                Text(
+                    text = marker,
+                    style = MaterialTheme.typography.labelSmall,
+                    color = MaterialTheme.colorScheme.onSurface,
+                    modifier = Modifier
+                        .align(Alignment.TopEnd)
+                        .padding(6.dp)
+                        .background(tint.copy(alpha = 0.55f), RoundedCornerShape(6.dp))
+                        .padding(horizontal = 5.dp, vertical = 1.dp),
+                )
             }
         }
     }

@@ -35,6 +35,7 @@
     <string name="library_add_duplicate">Already in your library</string>
     <string name="library_menu">More options</string>
     <string name="library_analyze">Analyze</string>
+    <string name="library_open_on_youtube">Open on YouTube</string>
     <string name="library_analyzing">Analyzing…</string>
     <string name="library_no_transcript">No transcript available</string>
     <!-- Phase 21: search + body-part filter + compact cards -->

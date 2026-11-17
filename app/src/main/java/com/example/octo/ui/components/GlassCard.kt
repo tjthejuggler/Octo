@@ -13,6 +13,7 @@ import androidx.compose.ui.draw.drawBehind
 import androidx.compose.ui.graphics.Brush
 import androidx.compose.ui.graphics.Color
 import androidx.compose.ui.graphics.Shape
+import androidx.compose.ui.graphics.lerp
 import androidx.compose.ui.unit.dp
 
 /**
@@ -34,6 +35,12 @@ fun GlassCard(
     /** Opacity 0..1: 1f = standard sea glass, higher alphas = hazier/more opaque. */
     opacity: Float = 1f,
     tone: GlassTone = GlassTone.Light,
+    /**
+     * FB28: optional muted hue blended into the pane (e.g. the library cards'
+     * last-played recency tiers). The pane keeps its sea-glass translucency —
+     * this only shifts the base color, a slight but noticeable tint.
+     */
+    tint: Color? = null,
     content: @Composable () -> Unit,
 ) {
     val darkTheme = MaterialTheme.colorScheme.surface == AbyssSurfaceRef
@@ -44,6 +51,11 @@ fun GlassCard(
         tone == GlassTone.Deep -> Color(0xFF0E2730) // AbyssSurface: dark teal glass
         useDeep -> FoamBright
         else -> Color.White
+    }.let { base ->
+        // FB28 tuning: clearly identifiable tier hue, still translucent glass —
+        // light theme leans harder into the tint (white base dilutes it), dark
+        // theme stays a step behind so the teal base keeps text readable.
+        if (tint != null) lerp(base, tint, if (darkTheme) 0.55f else 0.75f) else base
     }
     val baseAlpha = when {
         tone == GlassTone.Deep -> 0.93f

@@ -1,17 +1,18 @@
-# ADR: Home-screen widget (octopus-man, mirrored in Kenga)
+# ADR: Library card recency coloring (FB28)
 
-**Status:** Accepted (2026-11-08; final form after 4 iterations)
+## Status
+Accepted (2026-11-17)
 
 ## Context
-Users want the dashboard's mascot on the home screen: tap → open the app's main screen. Iteration history: (1) StackView swipe-to-flip — superseded; (2) bare 1×1 figure — clipped/dead space; (3) rounded card — rejected by user ("get rid of background bounding boxes"); (4) **final: bare mascot, transparent background**.
+Library video cards used a uniform blue-ish sea-glass tint with no signal of how stale a video's practice was. The app already has a tier color language on the body map (red→orange→green→blue→pink→yellow→white by sets done today).
 
 ## Decision
-- Classic `AppWidgetProvider` (no Glance), default **1 wide × 2 tall cells** (`targetCellWidth 1`, `targetCellHeight 2`), freely resizable, front view only.
-- The shipped bitmap is the mascot ONLY: rendered with the dashboard's exact pipeline, cropped to his alpha bounds, transparent background — no card, no padding box.
-- **CRITICAL renderer rule:** offscreen `CanvasDrawScope.scale(s, s)` MUST pass `pivot = Offset.Zero`. The default pivot is the canvas CENTER, which shifts the drawing right/down by `500s(1−s)` and clips the figure's right side + feet at widget scale (the dashboard masks this via aspect-matched sizing + calibrated centering constants).
-- Delivery: `setImageViewBitmap` with a 160k-pixel binder-safety downscale cap (~1 MB RemoteViews limit). No content URIs (launcher grants failed in the field).
-- Tap = `PendingIntent` → `MainActivity`. Refresh: widget add/resize + `MainActivity.onResume()` (`requestUpdate`); tier colors from DB (`bodyPartDao().forDayOnce` / `pbRepository.observeTodaySetCounts`).
+- Cards are tinted by LAST-PLAYED recency using the SAME tier palette anchors as the body map: today=white, yesterday=yellow, 2 days=pink, 3–6 days=blue, 7–13 days=green, 14–20 days=orange, older/never=red.
+- The tint lives in `GlassCard(tint=...)` as a lerp into the pane base (0.75 light / 0.55 dark) — sea-glass translucency is preserved, tier hue is clearly identifiable.
+- A compact age pill (today/3d/4w/2mo/1y) sits top-right; its background echoes the card's own tier color at 55% alpha.
+- Bucketing/marker logic is pure JVM code (`ui/library/LibraryRecency.kt`) with unit tests (`LibraryRecencyTest`); whole-local-day math avoids midnight-edge flicker.
+- The overflow-dots menu was removed; long-press (`combinedClickable`) opens a glass menu sheet: Analyze (conditional), Open on YouTube (canonical `VideoEntity.url` — present on every row since PK=videoId), Delete (reuses existing confirm dialog).
 
 ## Consequences
-- Visual parity via shared geometry/palette; Kenga inherits dashboard changes automatically (direct `drawBodyMap` reuse), Octo's hand-mirrored `OctoWidgetRenderer` must track `OctopusBodyView.drawBody` changes.
-- Push-driven refresh; midnight tier resets appear on next app open / resize / re-add.
+- One shared color language across Body + Library; red cards visually beg for attention.
+- Future import/share paths keep storing canonical URLs, so YouTube links stay universal — no schema change was needed.

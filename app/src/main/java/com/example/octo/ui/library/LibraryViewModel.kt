@@ -152,10 +152,11 @@ class LibraryViewModel(
     val sort: StateFlow<LibrarySort> = sortMode.asStateFlow()
     val sortDesc: StateFlow<Boolean> = sortDescending.asStateFlow()
 
-    /** videoId → most recent session timestamp (null-ish absent = never played). */
-    private val lastPlayed: Flow<Map<String, Long>> =
+    /** videoId → most recent session timestamp (absent = never played). */
+    val lastPlayed: StateFlow<Map<String, Long>> =
         sessionDao.lastPlayedPerVideo()
             .combine(items) { rows, _ -> rows.associate { it.videoId to it.lastPlayedAt } }
+            .stateIn(viewModelScope, SharingStarted.WhileSubscribed(5_000), emptyMap())
 
     /**
      * FB27: videos with at least one session STARTED today (any confirmation state —
